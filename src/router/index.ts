@@ -1,6 +1,6 @@
 
 import { createRouter, createWebHistory } from 'vue-router';
-// import { useAuthStore } from '@/stores/auth' // TODO: add
+import { useAuthStore } from '../stores/auth' // TODO: add
 
 const router = createRouter({
 	history: createWebHistory(import.meta.env.BASE_URL),
@@ -8,7 +8,7 @@ const router = createRouter({
 		{
 			path: '/',
 			name: 'home',
-			component: HomeView,
+			component: () => import('../views/HomeView.vue'),
 		},
 		{
 			path: '/login',
@@ -30,18 +30,13 @@ const router = createRouter({
 		},
 		{
 			path: '/dashboard',
-			component: () => import('../views/UserProfileView.vue'),
-			meta: { requiresAuth: true },
+			component: () => import('../views/DashboardLayout.vue'),
+			meta: { requiresAuth: false }, // TODO: set to true
 			children: [
 				{
-					path: '',
+					path: 'profile',
 					name: 'profile',
 					component: () => import('../views/UserProfileView.vue'),
-				},
-				{
-					path: 'edit',
-					name: 'edit-profile',
-					component: () => import('../views/EditProfileView.vue'),
 				},
 				{
 					path: 'find-buddy',

@@ -27,10 +27,6 @@
   </div>
 </template>
 
-<script setup>
-// TODO: home page links
-</script>
-
 <style scoped>
 .home-outer {
   display: flex;
