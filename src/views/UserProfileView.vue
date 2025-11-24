@@ -1,7 +1,7 @@
 <template>
   <section class="profile-edit">
     <h1>Edit Profile</h1>
-    <form @submit.prevent="saveProfile">
+    <form @submit.prevent="saveProfile" class="profile-form">
       <div class="form-group">
         <label for="displayname">Display Name</label>
         <input id="displayname" v-model="profile.displayname" type="text" required />
@@ -34,6 +34,13 @@
               <option value="male">Male</option>
               <option value="other">Other</option>
             </select>
+            <input
+              v-if="profile.tags.gender === 'other'"
+              v-model="profile.tags.genderOther"
+              type="text"
+              placeholder="You may specify here"
+              style="margin-top: 0.5em; width: 100%;"
+            />
           </div>
           <div>
             <label>Age</label>
@@ -58,17 +65,27 @@
               <option value="">Select</option>
               <option value="introvert">Introvert</option>
               <option value="extrovert">Extrovert</option>
+              <option value="ambivert">Ambivert</option>
             </select>
           </div>
         </div>
       </div>
       <button class="btn-primary" type="submit">Save Profile</button>
     </form>
+
+    <div class="change-password-trigger">
+      <button class="btn-link" @click="showPasswordModal = true">Change Password</button>
+    </div>
+
+    <ChangePasswordModal v-if="showPasswordModal" :show="showPasswordModal" @close="showPasswordModal = false" />
   </section>
 </template>
 
 <script setup>
+const showPasswordModal = ref(false);
+
 import { ref } from 'vue';
+import ChangePasswordModal from '../components/ChangePasswordModal.vue';
 // TODO: Replace with actual user/profile fetch from backend or Pinia store
 const profile = ref({
   displayname: '',
@@ -78,12 +95,14 @@ const profile = ref({
   emergencyContact: '',
   tags: {
     gender: '',
+    genderOther: '',
     age: '',
     runningLevel: '',
     runningPace: '',
     personality: '',
   },
 });
+
 
 function onImageChange(e) {
   const file = e.target.files[0];
@@ -103,49 +122,63 @@ function saveProfile() {
 </script>
 
 <style scoped>
+
 .profile-edit {
-  max-width: 500px;
-  margin: 2rem auto;
+  max-width: 540px;
+  margin: 2.5rem auto 0 auto;
   background: #fff;
-  border-radius: 16px;
-  padding: 2rem 2.5rem;
+  border-radius: 18px;
+  padding: 2.5rem 2.7rem 2.2rem 2.7rem;
 }
 .profile-edit h1 {
   font-family: 'Monoton', cursive;
   color: var(--color-primary);
-  font-size: 2rem;
-  margin-bottom: 1.5rem;
+  font-size: 2.1rem;
+  margin-bottom: 2.1rem;
   text-align: center;
+  letter-spacing: 0.5px;
+}
+.profile-form {
+  margin-bottom: 2.2rem;
 }
 .form-group {
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.4rem;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
 }
 .form-group label {
   font-weight: 600;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.1px;
 }
 .form-group input,
 .form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 0.5em;
+  padding: 0.55em;
   border: 1.5px solid var(--color-primary);
-  border-radius: 6px;
-  font-size: 1rem;
-  margin-bottom: 0.2rem;
+  border-radius: 7px;
+  font-size: 1.04rem;
+  margin-bottom: 0.18rem;
+  background: #f9fafd;
+  transition: border 0.2s;
+}
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  border: 1.5px solid #106cb8;
+  outline: none;
 }
 .profile-preview {
-  margin-top: 0.5rem;
+  margin-top: 0.7rem;
   max-width: 120px;
   border-radius: 50%;
 }
 .tags-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.2rem;
+  gap: 1.3rem;
   margin-top: 0.5rem;
 }
 .tags-grid > div {
@@ -156,15 +189,124 @@ function saveProfile() {
   background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   padding: 0.7em 2em;
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: 1.13rem;
   cursor: pointer;
-  margin-top: 1rem;
+  margin-top: 1.1rem;
   transition: background 0.2s;
 }
 .btn-primary:hover {
   background: #106cb8;
 }
+.change-password-trigger {
+  display: flex;
+  justify-content: flex-end;
+  margin: 2.7rem 0 0 0;
+}
+.btn-link {
+  background: none;
+  color: var(--color-primary);
+  border: none;
+  padding: 0.5em 1em;
+  font-size: 1rem;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+.btn-link:hover {
+  color: #106cb8;
+}
+/* Modal styles (for ChangePasswordModal) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 14px;
+  padding: 2rem 2.5rem 1.5rem 2.5rem;
+  min-width: 320px;
+  max-width: 95vw;
+  position: relative;
+}
+
+.change-password-trigger {
+  display: flex;
+  justify-content: flex-end;
+  margin: 2.5rem 0 0 0;
+}
+.btn-link {
+  background: none;
+  color: var(--color-primary);
+  border: none;
+  padding: 0.5em 1em;
+  font-size: 1rem;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+.btn-link:hover {
+  color: #106cb8;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 14px;
+  padding: 2rem 2.5rem 1.5rem 2.5rem;
+  min-width: 320px;
+  max-width: 95vw;
+  position: relative;
+}
+.change-password-form {
+  margin: 0;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+}
+.change-password-form h2 {
+  font-size: 1.3rem;
+  color: var(--color-primary);
+  margin-bottom: 1.2rem;
+  text-align: center;
+}
+.modal-actions {
+  display: flex;
+  gap: 1.2rem;
+  justify-content: flex-end;
+  margin-top: 1.2rem;
+}
+.error-msg {
+  color: #d32f2f;
+  margin-top: 0.7rem;
+  text-align: center;
+}
+.success-msg {
+  color: #388e3c;
+  margin-top: 0.7rem;
+  text-align: center;
+}
+
 </style>
