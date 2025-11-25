@@ -9,6 +9,7 @@
           <li><router-link to="/dashboard/messages">Messages</router-link></li>
           <li><router-link to="/dashboard/matches">Matches</router-link></li>
         </ul>
+        <button class="sidebar-logout" @click="onLogout">Logout</button>
       </nav>
     </aside>
     <main class="dashboard-main">
@@ -18,8 +19,16 @@
 </template>
 
 <script>
+import { useAuthStore } from '../stores/auth';
 export default {
   name: 'DashboardLayout',
+  setup() {
+    const auth = useAuthStore();
+    const onLogout = async () => {
+      await auth.logout();
+    };
+    return { onLogout };
+  },
 }
 </script>
 
@@ -66,6 +75,24 @@ export default {
   flex: 1;
   padding: 1.2rem 0.5rem 1.2rem 0.5rem;
   min-width: 0;
+}
+
+.sidebar-logout {
+  width: 100%;
+  margin-top: 2.5rem;
+  background: #ff7043;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.7em 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: background 0.18s;
+  display: block;
+}
+.sidebar-logout:hover {
+  background: #d84315;
 }
 </style>
 

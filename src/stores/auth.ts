@@ -1,7 +1,8 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { ApiService } from '../services/api'
-import { getFromStorage, setToStorage, removeFromStorage } from '../utils'
+import { ApiService } from '@/services/api'
+import { getFromStorage, setToStorage, removeFromStorage } from '@/utils'
+import { useRouter } from 'vue-router'
 
 interface User {
   id: string
@@ -9,6 +10,7 @@ interface User {
 }
 
 export const useAuthStore = defineStore('auth', () => {
+    const router = useRouter()
   // State
   const user = ref<User | null>(getFromStorage('user', null))
   const session = ref<string | null>(getFromStorage('session', null))
@@ -72,52 +74,16 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const logout = async () => {
-    try {
-      await ApiService.callConceptAction('logout', '', {})
-    } finally {
-      user.value = null
-      session.value = null
-      removeFromStorage('user')
-      removeFromStorage('session')
-      // Redirect to login page
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
-      }
+    // Redirect to login page first
+    if (router.currentRoute.value.path !== '/login') {
+      await router.push('/login')
     }
+    // Now clear user/session after navigation
+    user.value = null
+    session.value = null
+    removeFromStorage('user')
+    removeFromStorage('session')
   }
-
-  // Change password action
-  const changePassword = async (oldPassword: string, newPassword: string): Promise<boolean | string> => {
-    if (!user.value) return "Not authenticated";
-    try {
-      const response = await ApiService.callConceptAction<{ error?: string }>(
-        'PasswordAuthentication',
-        'changePassword',
-        { user: user.value.id, oldPassword, newPassword }
-      );
-      if (response && response.error) return response.error;
-      return true;
-    } catch (error) {
-      return "Failed to change password.";
-    }
-  };
-
-  // Delete user action
-  const deleteUser = async (): Promise<boolean | string> => {
-    if (!user.value) return "Not authenticated";
-    try {
-      const response = await ApiService.callConceptAction<{ error?: string }>(
-        'PasswordAuthentication',
-        'deleteUser',
-        { user: user.value.id }
-      );
-      if (response && response.error) return response.error;
-      await logout();
-      return true;
-    } catch (error) {
-      return "Failed to delete user.";
-    }
-  };
 
   return {
     // State
@@ -131,7 +97,5 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
-    changePassword,
-    deleteUser,
   }
 })

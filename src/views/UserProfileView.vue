@@ -6,25 +6,15 @@
         <label for="displayname">Display Name</label>
         <input id="displayname" v-model="profile.displayname" type="text" required />
       </div>
-      <div class="form-group">
-        <label for="profileImage">Profile Image</label>
-        <input id="profileImage" type="file" @change="onImageChange" accept="image/*" />
+      <div class="profile-avatar-row">
         <div v-if="profile.profileImage" class="profile-preview-wrapper">
           <img :src="profile.profileImage" alt="Profile Preview" class="profile-preview" />
         </div>
         <div v-else class="profile-fallback-avatar">
           <span>{{ (auth.user?.username?.charAt(0) || '?').toUpperCase() }}</span>
         </div>
+        <input id="profileImage" type="file" @change="onImageChange" accept="image/*" class="profile-image-input" />
       </div>
-        <div class="profile-avatar-row">
-          <div v-if="profile.profileImage" class="profile-preview-wrapper">
-            <img :src="profile.profileImage" alt="Profile Preview" class="profile-preview" />
-          </div>
-          <div v-else class="profile-fallback-avatar">
-            <span>{{ (auth.user?.username?.charAt(0) || '?').toUpperCase() }}</span>
-          </div>
-          <input id="profileImage" type="file" @change="onImageChange" accept="image/*" class="profile-image-input" />
-        </div>
       <div class="form-group">
         <label for="bio">Bio</label>
         <textarea id="bio" v-model="profile.bio" rows="3" />
@@ -169,11 +159,13 @@ function onPasswordChanged(msg) {
 <style scoped>
 
 .profile-edit {
-  max-width: 540px;
-  margin: 2.5rem auto 0 auto;
+  max-width: 480px;
+  margin: 3.5rem auto 0 auto;
   background: #fff;
   border-radius: 18px;
   padding: 2.5rem 2.7rem 2.2rem 2.7rem;
+  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.07);
+  position: relative;
 }
 .profile-edit h1 {
   font-family: 'Monoton', cursive;
@@ -186,6 +178,24 @@ function onPasswordChanged(msg) {
 .profile-form {
   margin-bottom: 2.2rem;
 }
+.profile-avatar-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2.1rem;
+  gap: 0.7rem;
+}
+.profile-image-input {
+  margin-top: 0.7rem;
+  font-size: 0.98rem;
+  color: #444;
+  background: #f7fafd;
+  border: 1.2px solid #e3e8f0;
+  border-radius: 7px;
+  padding: 0.4em 0.8em;
+  width: 80%;
+  max-width: 260px;
+}
 
 .form-group input:focus,
 .form-group textarea:focus,
@@ -194,26 +204,30 @@ function onPasswordChanged(msg) {
   outline: none;
 }
 .profile-preview {
-  margin-top: 0.7rem;
-  max-width: 120px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
-  width: 120px;
-  height: 120px;
   object-fit: cover;
   background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
 }
 .profile-preview-wrapper {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
 }
 .profile-fallback-avatar {
-  margin-top: 0.7rem;
-  width: 120px;
-  height: 120px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
   background: var(--color-accent);
   display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #fff;
+  user-select: none;
 }
 .profile-edit {
   max-width: 480px;
@@ -221,7 +235,6 @@ function onPasswordChanged(msg) {
   background: #fff;
   border-radius: 18px;
   padding: 2.5rem 2.7rem 2.2rem 2.7rem;
-  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.07);
   position: relative;
 }
 
@@ -246,10 +259,7 @@ function onPasswordChanged(msg) {
   width: 80%;
   max-width: 260px;
 }
-  font-weight: 700;
-  color: #fff;
-  user-select: none;
-}
+
 .tags-grid {
   display: flex;
   flex-wrap: wrap;
