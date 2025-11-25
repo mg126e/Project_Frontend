@@ -86,6 +86,39 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // Change password action
+  const changePassword = async (oldPassword: string, newPassword: string): Promise<boolean | string> => {
+    if (!user.value) return "Not authenticated";
+    try {
+      const response = await ApiService.callConceptAction<{ error?: string }>(
+        'PasswordAuthentication',
+        'changePassword',
+        { user: user.value.id, oldPassword, newPassword }
+      );
+      if (response && response.error) return response.error;
+      return true;
+    } catch (error) {
+      return "Failed to change password.";
+    }
+  };
+
+  // Delete user action
+  const deleteUser = async (): Promise<boolean | string> => {
+    if (!user.value) return "Not authenticated";
+    try {
+      const response = await ApiService.callConceptAction<{ error?: string }>(
+        'PasswordAuthentication',
+        'deleteUser',
+        { user: user.value.id }
+      );
+      if (response && response.error) return response.error;
+      await logout();
+      return true;
+    } catch (error) {
+      return "Failed to delete user.";
+    }
+  };
+
   return {
     // State
     user,
@@ -98,5 +131,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
+    changePassword,
+    deleteUser,
   }
 })

@@ -75,17 +75,29 @@
 
     <div class="change-password-trigger">
       <button class="btn-link" @click="showPasswordModal = true">Change Password</button>
+      <button class="btn-link danger" @click="onDeleteUser">Delete Account</button>
     </div>
 
-    <ChangePasswordModal v-if="showPasswordModal" :show="showPasswordModal" @close="showPasswordModal = false" />
+    <ChangePasswordModal
+      v-if="showPasswordModal"
+      :show="showPasswordModal"
+      @close="showPasswordModal = false"
+      @password-changed="onPasswordChanged"
+    />
+    <p v-if="deleteMsg" :class="{'error-msg': deleteMsgType==='error', 'success-msg': deleteMsgType==='success'}">{{ deleteMsg }}</p>
   </section>
 </template>
 
 <script setup>
-const showPasswordModal = ref(false);
-
 import { ref } from 'vue';
+import { useAuthStore } from '../stores/auth';
 import ChangePasswordModal from '../components/ChangePasswordModal.vue';
+
+const showPasswordModal = ref(false);
+const deleteMsg = ref('');
+const deleteMsgType = ref('');
+const auth = useAuthStore();
+
 // TODO: Replace with actual user/profile fetch from backend or Pinia store
 const profile = ref({
   displayname: '',
@@ -103,7 +115,6 @@ const profile = ref({
   },
 });
 
-
 function onImageChange(e) {
   const file = e.target.files[0];
   if (file) {
@@ -118,6 +129,24 @@ function onImageChange(e) {
 function saveProfile() {
   // TODO: Connect to backend or Pinia store for saving
   alert('Profile saved! (Connect this to your backend)');
+}
+
+async function onDeleteUser() {
+  if (confirm('Are you sure you want to delete your account? This cannot be undone.')) {
+    const result = await auth.deleteUser();
+    if (result === true) {
+      deleteMsg.value = 'Account deleted. You have been logged out.';
+      deleteMsgType.value = 'success';
+    } else {
+      deleteMsg.value = result || 'Failed to delete account.';
+      deleteMsgType.value = 'error';
+    }
+  }
+}
+
+function onPasswordChanged(msg) {
+  showPasswordModal.value = false;
+  // Optionally show a message
 }
 </script>
 

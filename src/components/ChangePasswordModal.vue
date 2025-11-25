@@ -28,14 +28,16 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useAuthStore } from '../stores/auth'
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'password-changed'])
 const props = defineProps({
   show: Boolean
 })
 const form = ref({ current: '', new: '', confirm: '' })
 const error = ref('')
 const success = ref('')
+const auth = useAuthStore()
 
 watch(() => props.show, (val) => {
   if (!val) {
@@ -45,7 +47,7 @@ watch(() => props.show, (val) => {
   }
 })
 
-function onSubmit() {
+async function onSubmit() {
   error.value = ''
   success.value = ''
   if (form.value.new !== form.value.confirm) {
@@ -56,12 +58,16 @@ function onSubmit() {
     error.value = 'Please fill in all fields.'
     return
   }
-  // TODO: Call backend or store action to change password
-  // Simulate success for now
-  success.value = 'Password changed successfully! (Connect this to your backend)'
-  form.value.current = ''
-  form.value.new = ''
-  form.value.confirm = ''
+  const result = await auth.changePassword(form.value.current, form.value.new)
+  if (result === true) {
+    success.value = 'Password changed successfully!'
+    emit('password-changed', success.value)
+    form.value.current = ''
+    form.value.new = ''
+    form.value.confirm = ''
+  } else {
+    error.value = result || 'Failed to change password.'
+  }
 }
 </script>
 
