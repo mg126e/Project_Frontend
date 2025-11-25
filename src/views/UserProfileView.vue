@@ -20,17 +20,17 @@
       </div>
       <div class="form-group">
         <label for="bio">Bio <span class="required-star">*</span></label>
-        <textarea id="bio" v-model="profile.bio" rows="3" required />
+        <textarea id="bio" v-model="profile.bio" rows="3" required></textarea>
       </div>
       <div class="form-group">
         <label for="location">Location <span class="required-star">*</span></label>
-        <input id="location" v-model="profile.location" type="text" required placeholder="e.g. San Francisco, CA" />
-        <span v-if="locationError" class="error-msg">Location must be in format: City, ST</span>
+        <input id="location" v-model="profile.location" type="text" required placeholder="e.g. San Francisco, CA" @input="onLocationInput" />
+        <span v-if="locationError" class="error-msg">Location must be in format: City, ST (e.g. San Francisco, CA)</span>
       </div>
       <div class="form-group">
         <label for="emergencyContact">Emergency Contact <span class="required-star">*</span></label>
-        <input id="emergencyContact" v-model="profile.emergencyContact" type="text" required placeholder="Contact Name" style="margin-bottom:0.5em;" />
-        <input id="emergencyContactPhone" v-model="profile.emergencyContactPhone" type="tel" required placeholder="Phone Number" @input="onEmergencyPhoneInput" />
+        <input id="emergencyContact" v-model="profile.emergencyContact.name" type="text" required placeholder="Contact Name" style="margin-bottom:0.5em;" />
+        <input id="emergencyContactPhone" v-model="profile.emergencyContact.phone" type="tel" required placeholder="Phone Number" @input="onEmergencyPhoneInput" />
         <span v-if="emergencyPhoneError" class="error-msg">Enter a valid phone number</span>
       </div>
       <div class="form-group">
@@ -68,8 +68,14 @@
           </div>
           <div>
             <label>Running Pace (min/mile) <span class="required-star">*</span></label>
-            <input v-model="profile.tags.runningPace" type="text" placeholder="e.g. 8:30" required @input="onPaceInput" />
-            <span v-if="paceError" class="error-msg">Running pace must be in correct format (e.g. 8:30)</span>
+              <input
+                v-model="profile.tags.runningPace"
+                type="text"
+                placeholder="e.g. 8:30"
+                required
+                @input="onPaceInput"
+              />
+              <span v-if="paceInputError" class="error-msg">Running pace must be in correct format (e.g. 8:30)</span>
           </div>
           <div>
             <label>Personality <span class="required-star">*</span></label>
@@ -108,8 +114,8 @@
       <div class="profile-view-bottom">
         <div class="profile-bottom-left">
           <span class="profile-label">Emergency Contact</span>
-          <span class="profile-value">{{ profile.emergencyContact }}<br v-if="profile.emergencyContact && profile.emergencyContactPhone" />
-            <span v-if="profile.emergencyContactPhone">📞 {{ profile.emergencyContactPhone }}</span>
+          <span class="profile-value">{{ profile.emergencyContact?.name }}<br v-if="profile.emergencyContact?.name && profile.emergencyContact?.phone" />
+            <span v-if="profile.emergencyContact?.phone">📞 {{ profile.emergencyContact.phone }}</span>
           </span>
         </div>
         <div class="profile-bottom-right">
@@ -140,6 +146,7 @@
 import { useAuthStore } from '../stores/auth';
 import { ref, computed, onMounted } from 'vue';
 import ChangePasswordModal from '../components/ChangePasswordModal.vue';
+import { useProfileStore } from '../stores/profile';
 
 const auth = useAuthStore();
 
@@ -147,56 +154,74 @@ const showPasswordModal = ref(false);
 const deleteMsg = ref('');
 const deleteMsgType = ref('');
 
-// TODO: Replace with actual user/profile fetch from backend or Pinia store
-const profile = ref({
-  displayname: '',
-  profileImage: '',
-  bio: '',
-  location: '',
-  emergencyContact: '',
-  emergencyContactPhone: '',
-  tags: {
-    gender: '',
-    genderOther: '',
-    age: '',
-    runningLevel: '',
-    runningPace: '',
-    personality: '',
-  },
-});
+const profileStore = useProfileStore();
+const profile = profileStore.profile;
 const emergencyPhoneError = ref(false);
 const passwordChangeMsg = ref('');
-function validatePhone(phone) {
-  // Accepts (123) 456-7890, 123-456-7890, 1234567890, 123.456.7890, 123 456 7890
-  return /^(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}$/.test(phone);
-}
-
-function onEmergencyPhoneInput() {
-  emergencyPhoneError.value = !validatePhone(profile.value.emergencyContactPhone);
-}
-
-
-
-const isEditMode = ref(false);
-const locationError = ref(false);
-const paceError = ref(false);
-const isProfileEmpty = computed(() => {
-  const p = profile.value;
-  return !p.displayname || !p.bio || !p.location || !p.emergencyContact || !p.emergencyContactPhone || !p.tags.gender || !p.tags.age || !p.tags.runningLevel || !p.tags.runningPace || !p.tags.personality;
-});
-function validatePaceFormat(pace) {
-  // Accepts #:## or ##:##, minutes:seconds, 1 or 2 digits for minutes, always 2 digits for seconds
-  return /^\d{1,2}:[0-5]\d$/.test(pace);
-}
-
-function onPaceInput() {
-  paceError.value = !validatePaceFormat(profile.value.tags.runningPace);
-}
 
 onMounted(() => {
+  // Only set edit mode on first mount if profile is empty
   if (isProfileEmpty.value) {
     isEditMode.value = true;
   }
+});
+
+function validatePhone(phone) {
+  // Accepts (123) 456-7890, 123-456-7890, 1234567890, 123.456.7890, 123 456 7890, +1 (123) 456-7890, etc.
+  return /^\s*(\+?1[-.\s]*)?(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\s*$/.test((phone || '').trim());
+}
+
+function validateLocationFormat(location) {
+  // Accepts: City, ST (2 letters, case-insensitive, optional spaces)
+  return /^\s*[^,]+,\s*[a-zA-Z]{2}\s*$/.test(location);
+}
+
+function validatePaceFormat(pace) {
+  // Accepts #:## or ##:##, minutes:seconds, 1 or 2 digits for minutes, always 2 digits for seconds
+  if (pace === undefined || pace === null) pace = '';
+  const paceStr = typeof pace === 'string' ? pace.trim() : String(pace).trim();
+  const result = /^\d{1,2}:[0-5]\d$/.test(paceStr);
+  return result;
+}
+
+function onEmergencyPhoneInput(event) {
+  const phone = event && event.target ? event.target.value : '';
+  // Only show error if field is non-empty and invalid
+  emergencyPhoneError.value = phone.length > 0 && !validatePhone(phone);
+}
+
+const isEditMode = ref(false);
+const locationError = ref(false);
+const paceInputError = ref(false);
+
+function onPaceInput(event) {
+  const pace = event && event.target ? event.target.value : '';
+  // Only show error if field is non-empty and invalid
+  paceInputError.value = pace.length > 0 && !validatePaceFormat(pace);
+}
+
+function onLocationInput(event) {
+  const value = event && event.target ? event.target.value : '';
+  // Only show error if field is non-empty and invalid
+  locationError.value = value.length > 0 && !validateLocationFormat(value);
+}
+
+const isProfileEmpty = computed(() => {
+  const p = profile.value || {};
+  const tags = p.tags || {};
+  const ec = p.emergencyContact || {};
+  return (
+    !p.displayname ||
+    !p.bio ||
+    !p.location ||
+    !ec.name ||
+    !ec.phone ||
+    !tags.gender ||
+    !tags.age ||
+    !tags.runningLevel ||
+    !tags.runningPace ||
+    !tags.personality
+  );
 });
 
 function onImageChange(e) {
@@ -210,30 +235,42 @@ function onImageChange(e) {
   }
 }
 
-function validateLocationFormat(location) {
-  // Accepts: City, ST (2 uppercase letters, optional spaces)
-  return /^\s*[^,]+,\s*[A-Z]{2}\s*$/.test(location);
-}
+async function saveProfile() {
+  const p = (profile && profile.value) ? profile.value : {};
+  const tags = p.tags || {};
+  const ec = p.emergencyContact || {};
+  locationError.value = (p.location || '').length > 0 && !validateLocationFormat(p.location || '');
+  emergencyPhoneError.value = (ec.phone || '').length > 0 && !validatePhone(ec.phone || '');
+  if (locationError.value) {
+    return;
+  }
+  paceInputError.value = (tags.runningPace || '').length > 0 && !validatePaceFormat(tags.runningPace || '');
+  if (paceInputError.value) {
+    return;
+  }
+  if (emergencyPhoneError.value) {
+    return;
+  }
+  try {
+    await profileStore.updateDisplayName(p.displayname || '');
+    await profileStore.updateBio(p.bio || '');
+    await profileStore.updateLocation(p.location || '');
+    await profileStore.updateEmergencyContact(ec.name || '', ec.phone || '');
 
-function saveProfile() {
-  locationError.value = false;
-  paceError.value = false;
-  emergencyPhoneError.value = false;
-  if (!validateLocationFormat(profile.value.location)) {
-    locationError.value = true;
-    return;
+    if (p.profileImage) {
+      await profileStore.updateProfileImage(p.profileImage);
+    }
+    // Tags
+    for (const tagType of ['gender', 'age', 'runningLevel', 'runningPace', 'personality']) {
+      if (tags[tagType]) {
+        await profileStore.updateTag(tagType, tags[tagType]);
+      }
+    }
+    // Optionally handle genderOther as a custom tag or field if needed
+    isEditMode.value = false; // TODO: review
+  } catch (e) {
+    alert('Failed to save profile.');
   }
-  if (!validatePaceFormat(profile.value.tags.runningPace)) {
-    paceError.value = true;
-    return;
-  }
-  if (!validatePhone(profile.value.emergencyContactPhone)) {
-    emergencyPhoneError.value = true;
-    return;
-  }
-  // TODO: Connect to backend/Pinia store for saving
-  isEditMode.value = false;
-  alert('Profile saved! (Connect this to your backend)');
 }
 
 async function onDeleteUser() {
