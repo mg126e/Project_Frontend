@@ -9,8 +9,22 @@
       <div class="form-group">
         <label for="profileImage">Profile Image</label>
         <input id="profileImage" type="file" @change="onImageChange" accept="image/*" />
-        <img v-if="profile.profileImage" :src="profile.profileImage" alt="Profile Preview" class="profile-preview" />
+        <div v-if="profile.profileImage" class="profile-preview-wrapper">
+          <img :src="profile.profileImage" alt="Profile Preview" class="profile-preview" />
+        </div>
+        <div v-else class="profile-fallback-avatar">
+          <span>{{ (auth.user?.username?.charAt(0) || '?').toUpperCase() }}</span>
+        </div>
       </div>
+        <div class="profile-avatar-row">
+          <div v-if="profile.profileImage" class="profile-preview-wrapper">
+            <img :src="profile.profileImage" alt="Profile Preview" class="profile-preview" />
+          </div>
+          <div v-else class="profile-fallback-avatar">
+            <span>{{ (auth.user?.username?.charAt(0) || '?').toUpperCase() }}</span>
+          </div>
+          <input id="profileImage" type="file" @change="onImageChange" accept="image/*" class="profile-image-input" />
+        </div>
       <div class="form-group">
         <label for="bio">Bio</label>
         <textarea id="bio" v-model="profile.bio" rows="3" />
@@ -89,14 +103,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+
 import { useAuthStore } from '../stores/auth';
+import { ref } from 'vue';
 import ChangePasswordModal from '../components/ChangePasswordModal.vue';
+
+const auth = useAuthStore();
 
 const showPasswordModal = ref(false);
 const deleteMsg = ref('');
 const deleteMsgType = ref('');
-const auth = useAuthStore();
 
 // TODO: Replace with actual user/profile fetch from backend or Pinia store
 const profile = ref({
@@ -170,29 +186,7 @@ function onPasswordChanged(msg) {
 .profile-form {
   margin-bottom: 2.2rem;
 }
-.form-group {
-  margin-bottom: 1.4rem;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-.form-group label {
-  font-weight: 600;
-  margin-bottom: 0.35rem;
-  letter-spacing: 0.1px;
-}
-.form-group input,
-.form-group textarea,
-.form-group select {
-  width: 100%;
-  padding: 0.55em;
-  border: 1.5px solid var(--color-primary);
-  border-radius: 7px;
-  font-size: 1.04rem;
-  margin-bottom: 0.18rem;
-  background: #f9fafd;
-  transition: border 0.2s;
-}
+
 .form-group input:focus,
 .form-group textarea:focus,
 .form-group select:focus {
@@ -203,16 +197,81 @@ function onPasswordChanged(msg) {
   margin-top: 0.7rem;
   max-width: 120px;
   border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  background: #fff;
+}
+.profile-preview-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+.profile-fallback-avatar {
+  margin-top: 0.7rem;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  display: flex;
+}
+.profile-edit {
+  max-width: 480px;
+  margin: 3.5rem auto 0 auto;
+  background: #fff;
+  border-radius: 18px;
+  padding: 2.5rem 2.7rem 2.2rem 2.7rem;
+  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.07);
+  position: relative;
+}
+
+.profile-form {
+  margin-bottom: 2.2rem;
+}
+.profile-avatar-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2.1rem;
+  gap: 0.7rem;
+}
+.profile-image-input {
+  margin-top: 0.7rem;
+  font-size: 0.98rem;
+  color: #444;
+  background: #f7fafd;
+  border: 1.2px solid #e3e8f0;
+  border-radius: 7px;
+  padding: 0.4em 0.8em;
+  width: 80%;
+  max-width: 260px;
+}
+  font-weight: 700;
+  color: #fff;
+  user-select: none;
 }
 .tags-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 1.3rem;
   margin-top: 0.5rem;
+.profile-preview {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
 }
 .tags-grid > div {
   flex: 1 1 180px;
   min-width: 120px;
+}
+.profile-preview-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .btn-primary {
   background: var(--color-primary);
@@ -228,11 +287,31 @@ function onPasswordChanged(msg) {
 }
 .btn-primary:hover {
   background: #106cb8;
+.profile-fallback-avatar {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: orange;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #fff;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
 }
 .change-password-trigger {
   display: flex;
   justify-content: flex-end;
   margin: 2.7rem 0 0 0;
+}
+.form-group {
+  margin-bottom: 1.3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 .btn-link {
   background: none;
@@ -246,27 +325,6 @@ function onPasswordChanged(msg) {
 }
 .btn-link:hover {
   color: #106cb8;
-}
-/* Modal styles (for ChangePasswordModal) */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0,0,0,0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal-content {
-  background: #fff;
-  border-radius: 14px;
-  padding: 2rem 2.5rem 1.5rem 2.5rem;
-  min-width: 320px;
-  max-width: 95vw;
-  position: relative;
 }
 
 .change-password-trigger {
@@ -288,27 +346,6 @@ function onPasswordChanged(msg) {
   color: #106cb8;
 }
 
-/* Modal styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0,0,0,0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal-content {
-  background: #fff;
-  border-radius: 14px;
-  padding: 2rem 2.5rem 1.5rem 2.5rem;
-  min-width: 320px;
-  max-width: 95vw;
-  position: relative;
-}
 .change-password-form {
   margin: 0;
   background: none;
