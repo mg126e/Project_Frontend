@@ -88,13 +88,13 @@
     <div v-else class="profile-view-grid">
       <div class="profile-view-main">
         <div class="profile-view-tags">
-          <div class="profile-tag-row"><span class="profile-label">Display Name</span><span class="profile-value">{{ profile.displayname }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label">Gender</span><span class="profile-value">{{ profile.tags.gender === 'other' ? profile.tags.genderOther : profile.tags.gender }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label">Age</span><span class="profile-value">{{ profile.tags.age }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label">Running Level</span><span class="profile-value">{{ profile.tags.runningLevel }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label">Running Pace</span><span class="profile-value">{{ profile.tags.runningPace }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label">Personality</span><span class="profile-value">{{ profile.tags.personality }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label">Location</span><span class="profile-value">{{ profile.location }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Display Name</span><span class="profile-value">{{ profile.displayname }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Gender</span><span class="profile-value">{{ profile.tags.gender === 'other' ? profile.tags.genderOther : profile.tags.gender }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Age</span><span class="profile-value">{{ profile.tags.age }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Running Level</span><span class="profile-value">{{ profile.tags.runningLevel }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Running Pace</span><span class="profile-value">{{ profile.tags.runningPace }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Personality</span><span class="profile-value">{{ profile.tags.personality }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Location</span><span class="profile-value">{{ profile.location }}</span></div>
         </div>
         <div class="profile-view-avatar-large">
           <div v-if="profile.profileImage" class="profile-preview-wrapper">
@@ -318,6 +318,13 @@ function onPasswordChanged(msg) {
   padding: 0.5em 1em;
   font-size: 1.05rem;
   color: #333;
+}
+.profile-label {
+  font-weight: 600;
+  min-width: 110px;
+}
+.profile-label--primary {
+  color: var(--color-primary);
 }
 .profile-view-avatar-large {
   display: flex;

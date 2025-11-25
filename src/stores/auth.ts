@@ -85,6 +85,39 @@ export const useAuthStore = defineStore('auth', () => {
     removeFromStorage('session')
   }
 
+  const changePassword = async (oldPassword: string, newPassword: string): Promise<true | string> => {
+    try {
+      if (!user.value?.id) {
+        return 'User not found.';
+      }
+      const response = await ApiService.callConceptAction<any>(
+        'PasswordAuthentication', 'changePassword', {
+        user: user.value.id,
+        oldPassword,
+        newPassword,
+      });
+      // Accept various success shapes, or empty/undefined response
+      if (
+        response === undefined || response === null ||
+        (typeof response === 'object' && (
+          Object.keys(response).length === 0 ||
+          response.success === true ||
+          response.result === 'ok' ||
+          response.status === 'success')
+        ) ||
+        (typeof response === 'string' && response.toLowerCase().includes('success'))
+      ) {
+        return true;
+      }
+      if (response && typeof response === 'object' && response.error) {
+        return response.error;
+      }
+      return 'Failed to change password.';
+    } catch (error: any) {
+      return error?.message || 'Failed to change password.';
+    }
+  };
+
   return {
     // State
     user,
@@ -97,5 +130,6 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
+    changePassword,
   }
 })
