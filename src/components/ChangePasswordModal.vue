@@ -50,14 +50,23 @@ watch(() => props.show, (val) => {
 async function onSubmit() {
   error.value = ''
   success.value = ''
+  if (!form.value.current || !form.value.new || !form.value.confirm) {
+    error.value = 'Please fill in all fields.'
+    return
+  }
+  if (form.value.new.length < 8) {
+    error.value = 'New password must be at least 8 characters.'
+    return
+  }
   if (form.value.new !== form.value.confirm) {
     error.value = 'New passwords do not match.'
     return
   }
-  if (!form.value.new || !form.value.current) {
-    error.value = 'Please fill in all fields.'
+  if (form.value.current === form.value.new) {
+    error.value = 'New password must be different from current password.'
     return
   }
+  // Optionally add more password strength checks here
   const result = await auth.changePassword(form.value.current, form.value.new)
   if (result === true) {
     success.value = 'Password changed successfully!'
@@ -152,11 +161,13 @@ async function onSubmit() {
   padding: 0.5em 1em;
   font-size: 1rem;
   cursor: pointer;
-  text-decoration: underline;
-  transition: color 0.2s;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
 }
 .btn-link:hover {
   color: #106cb8;
+  background: #e3f1fc;
 }
 .error-msg {
   color: #d32f2f;
