@@ -27,10 +27,13 @@
 </template>
 
 <script setup>
+
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useProfileStore } from '../stores/profile'
 import EmailVerificationModal from '../components/EmailVerificationModal.vue'
+
 
 const username = ref('')
 const email = ref('')

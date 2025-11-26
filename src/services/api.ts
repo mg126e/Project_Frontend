@@ -106,6 +106,21 @@ export class ApiService {
       throw error
     }
   }
+
+    /**
+   * FileUploading concept helpers
+   */
+  static async requestUploadURL(owner: string, filename: string): Promise<{ file: string; uploadURL: string } | { error: string }> {
+    return await ApiService.callConceptAction('FileUploading', 'requestUploadURL', { owner, filename });
+  }
+
+  static async confirmUpload(file: string): Promise<{ file: string } | { error: string }> {
+    return await ApiService.callConceptAction('FileUploading', 'confirmUpload', { file });
+  }
+
+  static async getDownloadURL(file: string): Promise<{ downloadURL: string } | { error: string }> {
+    return await ApiService.callConceptAction('FileUploading', 'getDownloadURL', { file });
+  }
 }
 
 export default apiClient
