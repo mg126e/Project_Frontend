@@ -31,7 +31,6 @@ export const useProfileStore = defineStore('profile', () => {
     emergencyContact: { name: '', phone: '' },
     tags: {
       gender: '',
-      genderOther: '',
       age: '',
       runningLevel: '',
       runningPace: '',
@@ -82,7 +81,6 @@ export const useProfileStore = defineStore('profile', () => {
     emergencyContact: { name: '', phone: '' },
     tags: {
       gender: '',
-      genderOther: '',
       age: '',
       runningLevel: '',
       runningPace: '',
@@ -102,15 +100,17 @@ export const useProfileStore = defineStore('profile', () => {
         profileImage = res.downloadURL + '?t=' + Date.now();
       }
     }
+    // Remove genderOther if present in backend tags
+    const tags = { ...defaultProfile.tags, ...(partial.tags || {}) };
+    if ('genderOther' in tags) {
+      delete tags.genderOther;
+    }
     const merged = {
       ...defaultProfile,
       ...partial,
       profileImage,
       emergencyContact: { name, phone },
-      tags: {
-        ...defaultProfile.tags,
-        ...(partial.tags || {})
-      }
+      tags
     };
     console.log('[mergeProfile] merged profile:', JSON.parse(JSON.stringify(merged)));
     return merged;

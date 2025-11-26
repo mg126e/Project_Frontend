@@ -98,7 +98,7 @@
       <div class="profile-view-main">
         <div class="profile-view-tags">
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Display Name</span><span class="profile-value">{{ profile.displayname }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Gender</span><span class="profile-value">{{ profile.tags.gender === 'other' ? profile.tags.genderOther : profile.tags.gender }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Gender</span><span class="profile-value">{{ profile.tags.gender === 'other' ? (profile.tags.genderOther || 'other') : profile.tags.gender }}</span></div>
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Age</span><span class="profile-value">{{ profile.tags.age }}</span></div>
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Running Level</span><span class="profile-value">{{ profile.tags.runningLevel }}</span></div>
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Running Pace</span><span class="profile-value">{{ profile.tags.runningPace }}</span></div>
@@ -176,7 +176,7 @@ function getProfileImageUrl(fileId) {
 // Local edit form for editing profile
 const editForm = ref({
   displayname: '',
-  profileImage: localStorage.getItem('profileImageBase64') || '',
+  profileImage: '',
   bio: '',
   location: '',
   emergencyContact: { name: '', phone: '' },
@@ -205,11 +205,9 @@ function startEdit() {
     personality: ''
   };
   const defaultEC = { name: '', phone: '' };
-  // Prefer localStorage image if present
-  const localImg = localStorage.getItem('profileImageBase64');
   editForm.value = {
     displayname: p.displayname || '',
-    profileImage: localImg || p.profileImage || '',
+    profileImage: p.profileImage || '',
     bio: p.bio || '',
     location: p.location || '',
     emergencyContact: { ...defaultEC, ...(p.emergencyContact || {}) },
@@ -323,15 +321,34 @@ function onLocationInput(event) {
 async function onImageChange(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(evt) {
-    const base64 = evt.target.result;
-    // Save to localStorage
-    localStorage.setItem('profileImageBase64', base64);
-    // Set in editForm
-    editForm.value.profileImage = base64;
-  };
-  reader.readAsDataURL(file);
+  // 1. Request upload URL and file ID from backend
+  const res = await fetch(`${FILE_API_BASE}/api/files/request-upload-url`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ owner: auth.user._id, filename: file.name })
+  });
+  const { file: fileId, uploadURL, error } = await res.json();
+  if (error) {
+    alert('Failed to get upload URL: ' + error);
+    return;
+  }
+  // 2. Upload the file to the uploadURL
+  const uploadRes = await fetch(uploadURL, {
+    method: 'PUT',
+    body: file
+  });
+  if (!uploadRes.ok) {
+    alert('Failed to upload file.');
+    return;
+  }
+  // 3. Confirm upload
+  await fetch(`${FILE_API_BASE}/api/files/confirm-upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file: fileId })
+  });
+  // 4. Set the file ID in the edit form
+  editForm.value.profileImage = fileId;
 }
 
 async function saveProfile() {
@@ -350,12 +367,19 @@ async function saveProfile() {
   if (emergencyPhoneError.value) {
     return;
   }
+  // If gender is 'other' and genderOther is filled, use genderOther as the value
+  let genderValue = tags.gender;
+  if (tags.gender === 'other' && tags.genderOther && tags.genderOther.trim()) {
+    genderValue = tags.genderOther.trim();
+  }
+  // Remove genderOther from tags before saving
+  const { genderOther, ...tagsWithoutGenderOther } = tags;
   const payload = {
     displayname: p.displayname,
     bio: p.bio,
     location: p.location,
     emergencyContact: { name: ec.name, phone: ec.phone },
-    tags: { ...tags },
+    tags: { ...tagsWithoutGenderOther, gender: genderValue },
     profileImage: p.profileImage
   };
   console.log('[saveProfile] Sending payload to batchUpdateProfile:', payload);
