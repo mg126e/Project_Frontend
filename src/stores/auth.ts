@@ -73,6 +73,18 @@ export const useAuthStore = defineStore('auth', () => {
       setToStorage('user', userData)
       setToStorage('session', sessionToken)
 
+
+      // Fetch user profile after registration (auto-creates if missing)
+      try {
+        // Dynamically import to avoid circular dependency
+        const { useProfileStore } = await import('@/stores/profile');
+        const profileStore = useProfileStore();
+        await profileStore.fetchProfile();
+      } catch (e) {
+        // Log but do not block registration if profile fetch/creation fails
+        console.error('Failed to fetch/create profile after registration:', e);
+      }
+
       return true
     } catch (error) {
       throw error

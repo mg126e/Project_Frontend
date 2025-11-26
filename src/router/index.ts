@@ -1,6 +1,6 @@
 
 import { createRouter, createWebHistory } from 'vue-router';
-import { useAuthStore } from '../stores/auth' // TODO: include here
+import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
 	history: createWebHistory(import.meta.env.BASE_URL),
@@ -31,7 +31,7 @@ const router = createRouter({
 		{
 			path: '/dashboard',
 			component: () => import('../views/DashboardLayout.vue'),
-			meta: { requiresAuth: false }, // TODO: set to true
+			meta: { requiresAuth: true }, 
 			children: [
 				{
 					path: 'profile',
@@ -96,6 +96,24 @@ const router = createRouter({
 			component: () => import('../views/NotFoundView.vue'),
 		},
 	],
+});
+
+router.beforeEach((to, from, next) => {
+	// Only run on client
+	if (typeof window !== 'undefined') {
+		const auth = useAuthStore();
+		if (to.matched.some(record => record.meta.requiresAuth)) {
+			if (!auth.user) {
+				return next({ name: 'login', query: { redirect: to.fullPath } });
+			}
+		}
+		if (to.matched.some(record => record.meta.requiresGuest)) {
+			if (auth.user) {
+				return next({ path: '/dashboard/profile' });
+			}
+		}
+	}
+	next();
 });
 
 export default router;

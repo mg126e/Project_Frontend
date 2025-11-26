@@ -20,12 +20,15 @@
 
 <script>
 import { useAuthStore } from '../stores/auth';
+import { useRouter } from 'vue-router';
 export default {
   name: 'DashboardLayout',
   setup() {
     const auth = useAuthStore();
+    const router = useRouter();
     const onLogout = async () => {
       await auth.logout();
+      router.push({ name: 'login' });
     };
     return { onLogout };
   },

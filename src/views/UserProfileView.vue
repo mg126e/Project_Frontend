@@ -4,11 +4,11 @@
     <form v-if="isEditMode" @submit.prevent="saveProfile" class="profile-form">
       <div class="form-group">
         <label for="displayname">Display Name <span class="required-star">*</span></label>
-        <input id="displayname" v-model="profile.displayname" type="text" required />
+        <input id="displayname" v-model="editForm.displayname" type="text" required />
       </div>
       <div class="profile-avatar-row">
-        <div v-if="profile.profileImage" class="profile-preview-wrapper">
-          <img :src="profile.profileImage" alt="Profile Preview" class="profile-preview" />
+        <div v-if="editForm.profileImage" class="profile-preview-wrapper">
+          <img :src="getProfileImageUrl(editForm.profileImage)" alt="Profile Preview" class="profile-preview" />
         </div>
         <div v-else class="profile-fallback-avatar">
           <span>{{ (auth.user?.username?.charAt(0) || '?').toUpperCase() }}</span>
@@ -20,17 +20,17 @@
       </div>
       <div class="form-group">
         <label for="bio">Bio <span class="required-star">*</span></label>
-        <textarea id="bio" v-model="profile.bio" rows="3" required></textarea>
+        <textarea id="bio" v-model="editForm.bio" rows="3" required></textarea>
       </div>
       <div class="form-group">
         <label for="location">Location <span class="required-star">*</span></label>
-        <input id="location" v-model="profile.location" type="text" required placeholder="e.g. San Francisco, CA" @input="onLocationInput" />
+        <input id="location" v-model="editForm.location" type="text" required placeholder="e.g. San Francisco, CA" @input="onLocationInput" />
         <span v-if="locationError" class="error-msg">Location must be in format: City, ST (e.g. San Francisco, CA)</span>
       </div>
       <div class="form-group">
         <label for="emergencyContact">Emergency Contact <span class="required-star">*</span></label>
-        <input id="emergencyContact" v-model="profile.emergencyContact.name" type="text" required placeholder="Contact Name" style="margin-bottom:0.5em;" />
-        <input id="emergencyContactPhone" v-model="profile.emergencyContact.phone" type="tel" required placeholder="Phone Number" @input="onEmergencyPhoneInput" />
+        <input id="emergencyContact" v-model="editForm.emergencyContact.name" type="text" required placeholder="Contact Name" style="margin-bottom:0.5em;" />
+        <input id="emergencyContactPhone" v-model="editForm.emergencyContact.phone" type="tel" required placeholder="Phone Number" @input="onEmergencyPhoneInput" />
         <span v-if="emergencyPhoneError" class="error-msg">Enter a valid phone number</span>
       </div>
       <div class="form-group">
@@ -38,15 +38,15 @@
         <div class="tags-grid">
           <div>
             <label>Gender <span class="required-star">*</span></label>
-            <select v-model="profile.tags.gender" required>
+            <select v-model="editForm.tags.gender" required>
               <option value="">Select</option>
               <option value="female">Female</option>
               <option value="male">Male</option>
               <option value="other">Other</option>
             </select>
             <input
-              v-if="profile.tags.gender === 'other'"
-              v-model="profile.tags.genderOther"
+              v-if="editForm.tags.gender === 'other'"
+              v-model="editForm.tags.genderOther"
               type="text"
               placeholder="You may specify here"
               style="margin-top: 0.5em; width: 100%;"
@@ -55,11 +55,11 @@
           </div>
           <div>
             <label>Age <span class="required-star">*</span></label>
-            <input v-model="profile.tags.age" type="number" min="0" required />
+            <input v-model="editForm.tags.age" type="number" min="0" required />
           </div>
           <div>
             <label>Running Level <span class="required-star">*</span></label>
-            <select v-model="profile.tags.runningLevel" required>
+            <select v-model="editForm.tags.runningLevel" required>
               <option value="">Select</option>
               <option value="beginner">Beginner</option>
               <option value="intermediate">Intermediate</option>
@@ -69,7 +69,7 @@
           <div>
             <label>Running Pace (min/mile) <span class="required-star">*</span></label>
               <input
-                v-model="profile.tags.runningPace"
+                v-model="editForm.tags.runningPace"
                 type="text"
                 placeholder="e.g. 8:30"
                 required
@@ -79,7 +79,7 @@
           </div>
           <div>
             <label>Personality <span class="required-star">*</span></label>
-            <select v-model="profile.tags.personality" required>
+            <select v-model="editForm.tags.personality" required>
               <option value="">Select</option>
               <option value="introvert">Introvert</option>
               <option value="extrovert">Extrovert</option>
@@ -88,7 +88,10 @@
           </div>
         </div>
       </div>
-      <button class="btn-primary" type="submit">Save Profile</button>
+      <div style="display: flex; gap: 1rem; margin-top: 1.2rem;">
+        <button class="btn-primary" type="submit">Save Profile</button>
+        <button class="btn-link" type="button" @click="cancelEdit">Cancel</button>
+      </div>
     </form>
 
     <div v-else class="profile-view-grid">
@@ -104,7 +107,7 @@
         </div>
         <div class="profile-view-avatar-large">
           <div v-if="profile.profileImage" class="profile-preview-wrapper">
-            <img :src="profile.profileImage" alt="Profile Preview" class="profile-preview-large" />
+            <img :src="getProfileImageUrl(profile.profileImage)" alt="Profile Preview" class="profile-preview-large" />
           </div>
           <div v-else class="profile-fallback-avatar-large">
             <span>{{ (auth.user?.username?.charAt(0) || '?').toUpperCase() }}</span>
@@ -123,7 +126,7 @@
           <span class="profile-value">{{ profile.bio }}</span>
         </div>
       </div>
-      <button class="btn-primary" @click="isEditMode = true" style="margin-top:1.5rem;">Edit Profile</button>
+      <button class="btn-primary" @click="startEdit" style="margin-top:1.5rem;">Edit Profile</button>
     </div>
 
     <div v-if="isEditMode" class="change-password-trigger">
@@ -143,10 +146,108 @@
 </template>
 
 <script setup>
+
+// Helper to cache download URLs for file IDs
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const FILE_API_BASE = API_BASE.endsWith('/api') ? API_BASE.slice(0, -4) : API_BASE;
+const downloadUrlCache = {};
+function getProfileImageUrl(fileId) {
+  if (!fileId) return '';
+  if (fileId.startsWith('data:image/')) return fileId; // fallback for legacy base64
+  if (downloadUrlCache[fileId]) return downloadUrlCache[fileId];
+  // Start async fetch, but return empty string for now
+  fetch(`${FILE_API_BASE}/api/files/get-download-url`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file: fileId })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.downloadURL) {
+        downloadUrlCache[fileId] = data.downloadURL;
+        // Force update by triggering a reactive change
+        if (editForm.value.profileImage === fileId) editForm.value.profileImage = '' + fileId;
+        if (profile.value.profileImage === fileId) profile.value.profileImage = '' + fileId;
+      }
+    });
+  return '';
+}
+
+// Local edit form for editing profile
+const editForm = ref({
+  displayname: '',
+  profileImage: localStorage.getItem('profileImageBase64') || '',
+  bio: '',
+  location: '',
+  emergencyContact: { name: '', phone: '' },
+  tags: {
+    gender: '',
+    genderOther: '',
+    age: '',
+    runningLevel: '',
+    runningPace: '',
+    personality: ''
+  }
+});
+
+function startEdit() {
+  // Only copy from the already-loaded profile.value
+  const p = profile.value || {};
+  // Debug log for profile.value
+  console.log('[startEdit] profile.value:', JSON.parse(JSON.stringify(p)));
+  // Merge defaults with profile data for tags and emergencyContact
+  const defaultTags = {
+    gender: '',
+    genderOther: '',
+    age: '',
+    runningLevel: '',
+    runningPace: '',
+    personality: ''
+  };
+  const defaultEC = { name: '', phone: '' };
+  // Prefer localStorage image if present
+  const localImg = localStorage.getItem('profileImageBase64');
+  editForm.value = {
+    displayname: p.displayname || '',
+    profileImage: localImg || p.profileImage || '',
+    bio: p.bio || '',
+    location: p.location || '',
+    emergencyContact: { ...defaultEC, ...(p.emergencyContact || {}) },
+    tags: { ...defaultTags, ...(p.tags || {}) }
+  };
+  isEditMode.value = true;
+  // Debug log
+  console.log('[startEdit] editForm after copy:', JSON.parse(JSON.stringify(editForm.value)));
+}
+
+function cancelEdit() {
+  // Reset editForm to last saved profile values and exit edit mode
+  const p = profile.value || {};
+  const defaultTags = {
+    gender: '',
+    genderOther: '',
+    age: '',
+    runningLevel: '',
+    runningPace: '',
+    personality: ''
+  };
+  const defaultEC = { name: '', phone: '' };
+  editForm.value = {
+    displayname: p.displayname || '',
+    profileImage: p.profileImage || '',
+    bio: p.bio || '',
+    location: p.location || '',
+    emergencyContact: { ...defaultEC, ...(p.emergencyContact || {}) },
+    tags: { ...defaultTags, ...(p.tags || {}) }
+  };
+  isEditMode.value = false;
+}
+
+import { ref, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
-import { ref, computed, onMounted } from 'vue';
 import ChangePasswordModal from '../components/ChangePasswordModal.vue';
 import { useProfileStore } from '../stores/profile';
+import { storeToRefs } from 'pinia';
 
 const auth = useAuthStore();
 
@@ -155,16 +256,29 @@ const deleteMsg = ref('');
 const deleteMsgType = ref('');
 
 const profileStore = useProfileStore();
-const profile = profileStore.profile;
+const { profile } = storeToRefs(profileStore);
+
 const emergencyPhoneError = ref(false);
 const passwordChangeMsg = ref('');
 
-onMounted(() => {
-  // Only set edit mode on first mount if profile is empty
-  if (isProfileEmpty.value) {
-    isEditMode.value = true;
-  }
+
+onMounted(async () => {
+  await profileStore.fetchProfile();
 });
+
+import { watch } from 'vue';
+// Watch for profile changes and trigger startEdit if inactive
+// Only trigger startEdit if profile is inactive AND has required fields (not empty)
+watch(profile, (newProfile) => {
+  if (
+    newProfile &&
+    newProfile.isActive === false &&
+    newProfile.displayname &&
+    newProfile.displayname.length > 0
+  ) {
+    startEdit();
+  }
+}, { immediate: true });
 
 function validatePhone(phone) {
   // Accepts (123) 456-7890, 123-456-7890, 1234567890, 123.456.7890, 123 456 7890, +1 (123) 456-7890, etc.
@@ -206,37 +320,22 @@ function onLocationInput(event) {
   locationError.value = value.length > 0 && !validateLocationFormat(value);
 }
 
-const isProfileEmpty = computed(() => {
-  const p = profile.value || {};
-  const tags = p.tags || {};
-  const ec = p.emergencyContact || {};
-  return (
-    !p.displayname ||
-    !p.bio ||
-    !p.location ||
-    !ec.name ||
-    !ec.phone ||
-    !tags.gender ||
-    !tags.age ||
-    !tags.runningLevel ||
-    !tags.runningPace ||
-    !tags.personality
-  );
-});
-
-function onImageChange(e) {
+async function onImageChange(e) {
   const file = e.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      profile.value.profileImage = event.target.result;
-    };
-    reader.readAsDataURL(file);
-  }
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const base64 = evt.target.result;
+    // Save to localStorage
+    localStorage.setItem('profileImageBase64', base64);
+    // Set in editForm
+    editForm.value.profileImage = base64;
+  };
+  reader.readAsDataURL(file);
 }
 
 async function saveProfile() {
-  const p = (profile && profile.value) ? profile.value : {};
+  const p = editForm.value;
   const tags = p.tags || {};
   const ec = p.emergencyContact || {};
   locationError.value = (p.location || '').length > 0 && !validateLocationFormat(p.location || '');
@@ -251,23 +350,20 @@ async function saveProfile() {
   if (emergencyPhoneError.value) {
     return;
   }
+  const payload = {
+    displayname: p.displayname,
+    bio: p.bio,
+    location: p.location,
+    emergencyContact: { name: ec.name, phone: ec.phone },
+    tags: { ...tags },
+    profileImage: p.profileImage
+  };
+  console.log('[saveProfile] Sending payload to batchUpdateProfile:', payload);
   try {
-    await profileStore.updateDisplayName(p.displayname || '');
-    await profileStore.updateBio(p.bio || '');
-    await profileStore.updateLocation(p.location || '');
-    await profileStore.updateEmergencyContact(ec.name || '', ec.phone || '');
-
-    if (p.profileImage) {
-      await profileStore.updateProfileImage(p.profileImage);
-    }
-    // Tags
-    for (const tagType of ['gender', 'age', 'runningLevel', 'runningPace', 'personality']) {
-      if (tags[tagType]) {
-        await profileStore.updateTag(tagType, tags[tagType]);
-      }
-    }
-    // Optionally handle genderOther as a custom tag or field if needed
-    isEditMode.value = false; // TODO: review
+    await profileStore.batchUpdateProfile(payload);
+    // Re-fetch profile to update profileImage and all fields
+    await profileStore.fetchProfile();
+    isEditMode.value = false;
   } catch (e) {
     alert('Failed to save profile.');
   }
@@ -310,7 +406,6 @@ function onPasswordChanged(msg) {
   position: relative;
 }
 .profile-edit h1 {
-  font-family: 'Monoton', cursive;
   color: var(--color-primary);
   font-size: 2.1rem;
   margin-bottom: 2.1rem;

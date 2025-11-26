@@ -1,4 +1,3 @@
-
 import { ref, computed, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { ApiService } from '@/services/api';
@@ -17,6 +16,7 @@ interface UserProfile {
   location?: string;
   emergencyContact?: EmergencyContact;
   tags?: Record<string, string | number>;
+  isActive?: boolean;
 }
 
 export const useProfileStore = defineStore('profile', () => {
@@ -50,10 +50,21 @@ export const useProfileStore = defineStore('profile', () => {
       const userId = getUserId();
       if (!userId) throw new Error('User not found');
       const result = await ApiService.callConceptAction('UserProfile', 'getProfile', { user: userId });
+      console.log('result:', result);
       if (result && !result.error) {
-        profile.value = await mergeProfile(result as UserProfile);
-        // Debug: log the resolved profile after refresh
+        const merged = await mergeProfile(result as UserProfile);
+        // Only mutate properties, never replace the object
+        for (const key of Object.keys(merged)) {
+          // @ts-ignore
+          profile.value[key] = merged[key];
+        }
         console.log('[fetchProfile after mergeProfile] profile.value:', profile.value);
+      } else if (result && typeof result === 'object' && 'error' in result && String(result.error).toLowerCase().includes('not found')) {
+        // If profile not found, create it and retry
+        console.warn('Profile not found, creating profile...');
+        await createProfile();
+        // createProfile already calls fetchProfile, so return
+        return;
       } else {
         error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to fetch profile.';
       }
@@ -76,10 +87,12 @@ export const useProfileStore = defineStore('profile', () => {
       runningLevel: '',
       runningPace: '',
       personality: ''
-    }
+    },
+    isActive: false
   };
 
   async function mergeProfile(partial: Partial<UserProfile>): Promise<UserProfile> {
+    console.log('[mergeProfile] backend returned:', JSON.parse(JSON.stringify(partial)));
     const { name = '', phone = '' } = partial.emergencyContact || {};
     let profileImage = '';
     if (partial.profileImage) {
@@ -89,7 +102,7 @@ export const useProfileStore = defineStore('profile', () => {
         profileImage = res.downloadURL + '?t=' + Date.now();
       }
     }
-    return {
+    const merged = {
       ...defaultProfile,
       ...partial,
       profileImage,
@@ -99,6 +112,8 @@ export const useProfileStore = defineStore('profile', () => {
         ...(partial.tags || {})
       }
     };
+    console.log('[mergeProfile] merged profile:', JSON.parse(JSON.stringify(merged)));
+    return merged;
   }
 
   async function createProfile(): Promise<void> {
@@ -126,11 +141,11 @@ export const useProfileStore = defineStore('profile', () => {
     try {
       const userId = getUserId();
       if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', 'setName', { user: userId, displayname });
-      if (result && !result.error) {
-        await fetchProfile();
-      } else {
-        error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update display name.';
+      const payload = { user: userId, displayname };
+      console.log('[updateDisplayName] Payload:', payload);
+      const result = await ApiService.callConceptAction('UserProfile', 'setName', payload);
+      if (result && result.error) {
+        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update display name.';
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update display name.';
@@ -189,11 +204,11 @@ export const useProfileStore = defineStore('profile', () => {
     try {
       const userId = getUserId();
       if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', 'setBio', { user: userId, bio });
-      if (result && !result.error) {
-        await fetchProfile();
-      } else {
-        error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update bio.';
+      const payload = { user: userId, bio };
+      console.log('[updateBio] Payload:', payload);
+      const result = await ApiService.callConceptAction('UserProfile', 'setBio', payload);
+      if (result && result.error) {
+        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update bio.';
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update bio.';
@@ -209,11 +224,11 @@ export const useProfileStore = defineStore('profile', () => {
     try {
       const userId = getUserId();
       if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', 'setLocation', { user: userId, location });
-      if (result && !result.error) {
-        await fetchProfile();
-      } else {
-        error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update location.';
+      const payload = { user: userId, location };
+      console.log('[updateLocation] Payload:', payload);
+      const result = await ApiService.callConceptAction('UserProfile', 'setLocation', payload);
+      if (result && result.error) {
+        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update location.';
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update location.';
@@ -229,11 +244,11 @@ export const useProfileStore = defineStore('profile', () => {
     try {
       const userId = getUserId();
       if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', 'setEmergencyContact', { user: userId, name, phone });
-      if (result && !result.error) {
-        await fetchProfile();
-      } else {
-        error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update emergency contact.';
+      const payload = { user: userId, name, phone };
+      console.log('[updateEmergencyContact] Payload:', payload);
+      const result = await ApiService.callConceptAction('UserProfile', 'setEmergencyContact', payload);
+      if (result && result.error) {
+        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update emergency contact.';
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update emergency contact.';
@@ -249,14 +264,65 @@ export const useProfileStore = defineStore('profile', () => {
     try {
       const userId = getUserId();
       if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', 'setTag', { user: userId, tagType, value });
-      if (result && !result.error) {
-        await fetchProfile();
-      } else {
-        error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update tag.';
+      const payload = { user: userId, tagType, value };
+      console.log('[updateTag] Payload:', payload);
+      const result = await ApiService.callConceptAction('UserProfile', 'setTag', payload);
+      if (result && result.error) {
+        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update tag.';
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update tag.';
+      throw e;
+    } finally {
+      loading.value = false;
+    }
+  }
+  async function setIsActive(isActive: boolean): Promise<void> {
+    loading.value = true;
+    error.value = '';
+    try {
+      const userId = getUserId();
+      if (!userId) throw new Error('User not found');
+      const payload = { user: userId, isActive };
+      const result = await ApiService.callConceptAction('UserProfile', 'setIsActive', payload);
+      if (result && result.error) {
+        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update isActive.';
+      } else {
+        profile.value.isActive = isActive;
+      }
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update isActive.';
+      throw e;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function batchUpdateProfile(newProfile: UserProfile): Promise<void> {
+    loading.value = true;
+    error.value = '';
+    console.log('[batchUpdateProfile] Received newProfile:', newProfile);
+    try {
+      const userId = getUserId();
+      if (!userId) throw new Error('User not found');
+      // Update each field, but do not fetch after each
+      await updateDisplayName(newProfile.displayname || '');
+      await updateBio(newProfile.bio || '');
+      console.log('[batchUpdateProfile] profile.value.location before updateLocation:', profile.value.location);
+      await updateLocation(newProfile.location || '');
+      const ec = newProfile.emergencyContact || { name: '', phone: '' };
+      await updateEmergencyContact(ec.name || '', ec.phone || '');
+      const tags = newProfile.tags || {};
+      for (const tagType of ['gender', 'age', 'runningLevel', 'runningPace', 'personality']) {
+        if (tags[tagType]) {
+          await updateTag(tagType, tags[tagType]);
+        }
+      }
+      await setIsActive(true);
+      // Only fetch once at the end
+      await fetchProfile();
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update profile.';
       throw e;
     } finally {
       loading.value = false;
@@ -274,8 +340,11 @@ export const useProfileStore = defineStore('profile', () => {
         fetchProfile();
       }
       if (!newUserId) {
-        // Optionally clear profile on logout
-        profile.value = { ...defaultProfile };
+        // Optionally clear profile on logout, but keep the reference
+        for (const key of Object.keys(defaultProfile)) {
+          // @ts-ignore
+          profile.value[key] = defaultProfile[key];
+        }
       }
     }
   );
@@ -293,5 +362,7 @@ export const useProfileStore = defineStore('profile', () => {
     updateLocation,
     updateEmergencyContact,
     updateTag,
+    batchUpdateProfile,
+    setIsActive
   };
 });
