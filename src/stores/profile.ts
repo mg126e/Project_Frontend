@@ -1,5 +1,5 @@
 
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { defineStore } from 'pinia';
 import { ApiService } from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
@@ -12,6 +12,7 @@ interface EmergencyContact {
 interface UserProfile {
   displayname?: string;
   profileImage?: string;
+  profileImageFileId?: string;
   bio?: string;
   location?: string;
   emergencyContact?: EmergencyContact;
@@ -50,7 +51,9 @@ export const useProfileStore = defineStore('profile', () => {
       if (!userId) throw new Error('User not found');
       const result = await ApiService.callConceptAction('UserProfile', 'getProfile', { user: userId });
       if (result && !result.error) {
-        profile.value = mergeProfile(result as UserProfile);
+        profile.value = await mergeProfile(result as UserProfile);
+        // Debug: log the resolved profile after refresh
+        console.log('[fetchProfile after mergeProfile] profile.value:', profile.value);
       } else {
         error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to fetch profile.';
       }
@@ -76,11 +79,20 @@ export const useProfileStore = defineStore('profile', () => {
     }
   };
 
-  function mergeProfile(partial: Partial<UserProfile>): UserProfile {
+  async function mergeProfile(partial: Partial<UserProfile>): Promise<UserProfile> {
     const { name = '', phone = '' } = partial.emergencyContact || {};
+    let profileImage = '';
+    if (partial.profileImage) {
+      // If profileImage is a fileId, resolve to download URL
+      const res = await ApiService.getDownloadURL(partial.profileImage);
+      if (res && 'downloadURL' in res) {
+        profileImage = res.downloadURL + '?t=' + Date.now();
+      }
+    }
     return {
       ...defaultProfile,
       ...partial,
+      profileImage,
       emergencyContact: { name, phone },
       tags: {
         ...defaultProfile.tags,
@@ -116,7 +128,7 @@ export const useProfileStore = defineStore('profile', () => {
       if (!userId) throw new Error('User not found');
       const result = await ApiService.callConceptAction('UserProfile', 'setName', { user: userId, displayname });
       if (result && !result.error) {
-        profile.value = { ...(profile.value || {}), displayname };
+        await fetchProfile();
       } else {
         error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update display name.';
       }
@@ -128,15 +140,38 @@ export const useProfileStore = defineStore('profile', () => {
     }
   }
 
-  async function updateProfileImage(image: string): Promise<void> {
+  async function updateProfileImage(file: File): Promise<void> {
     loading.value = true;
     error.value = '';
     try {
       const userId = getUserId();
       if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', 'setProfileImage', { user: userId, image });
+      // 1. Request upload URL
+      const filename = file.name;
+      const uploadRes = await ApiService.requestUploadURL(userId, filename);
+      if (!uploadRes || 'error' in uploadRes) {
+        throw new Error(uploadRes?.error || 'Failed to get upload URL');
+      }
+      // 2. Upload file to uploadURL (local: PUT to /uploads/...)
+      const uploadURL = uploadRes.uploadURL;
+      const fileId = uploadRes.file;
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file,
+      });
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file');
+      }
+      // 3. Confirm upload
+      const confirmRes = await ApiService.confirmUpload(fileId);
+      if (!confirmRes || 'error' in confirmRes) {
+        throw new Error(confirmRes?.error || 'Failed to confirm upload');
+      }
+      // 4. Save fileId in profile (setProfileImage)
+      const result = await ApiService.callConceptAction('UserProfile', 'setProfileImage', { user: userId, image: fileId });
       if (result && !result.error) {
-        profile.value = { ...(profile.value || {}), profileImage: image };
+        // Always re-fetch the profile to ensure the image is resolved and state is in sync
+        await fetchProfile();
       } else {
         error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update profile image.';
       }
@@ -156,7 +191,7 @@ export const useProfileStore = defineStore('profile', () => {
       if (!userId) throw new Error('User not found');
       const result = await ApiService.callConceptAction('UserProfile', 'setBio', { user: userId, bio });
       if (result && !result.error) {
-        profile.value = { ...(profile.value || {}), bio };
+        await fetchProfile();
       } else {
         error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update bio.';
       }
@@ -176,7 +211,7 @@ export const useProfileStore = defineStore('profile', () => {
       if (!userId) throw new Error('User not found');
       const result = await ApiService.callConceptAction('UserProfile', 'setLocation', { user: userId, location });
       if (result && !result.error) {
-        profile.value = { ...(profile.value || {}), location };
+        await fetchProfile();
       } else {
         error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update location.';
       }
@@ -196,7 +231,7 @@ export const useProfileStore = defineStore('profile', () => {
       if (!userId) throw new Error('User not found');
       const result = await ApiService.callConceptAction('UserProfile', 'setEmergencyContact', { user: userId, name, phone });
       if (result && !result.error) {
-        profile.value = { ...(profile.value || {}), emergencyContact: { name, phone } };
+        await fetchProfile();
       } else {
         error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update emergency contact.';
       }
@@ -216,9 +251,7 @@ export const useProfileStore = defineStore('profile', () => {
       if (!userId) throw new Error('User not found');
       const result = await ApiService.callConceptAction('UserProfile', 'setTag', { user: userId, tagType, value });
       if (result && !result.error) {
-        const tags = { ...((profile.value && profile.value.tags) || {}) };
-        tags[tagType] = value;
-        profile.value = { ...(profile.value || {}), tags };
+        await fetchProfile();
       } else {
         error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update tag.';
       }
@@ -230,29 +263,22 @@ export const useProfileStore = defineStore('profile', () => {
     }
   }
 
-  async function removeTag(tagType: string): Promise<void> {
-    loading.value = true;
-    error.value = '';
-    try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', 'removeTag', { user: userId, tagType });
-      if (result && !result.error) {
-        if (profile.value && profile.value.tags) {
-          const tags = { ...profile.value.tags };
-          delete tags[tagType];
-          profile.value = { ...profile.value, tags };
-        }
-      } else {
-        error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to remove tag.';
-      }
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to remove tag.';
-      throw e;
-    } finally {
-      loading.value = false;
-    }
+  // Automatically fetch profile on store creation and whenever user changes
+  if (getUserId()) {
+    fetchProfile();
   }
+  watch(
+    () => authStore.user?.id,
+    (newUserId, oldUserId) => {
+      if (newUserId && newUserId !== oldUserId) {
+        fetchProfile();
+      }
+      if (!newUserId) {
+        // Optionally clear profile on logout
+        profile.value = { ...defaultProfile };
+      }
+    }
+  );
 
   return {
     profile,
@@ -267,6 +293,5 @@ export const useProfileStore = defineStore('profile', () => {
     updateLocation,
     updateEmergencyContact,
     updateTag,
-    removeTag,
   };
 });

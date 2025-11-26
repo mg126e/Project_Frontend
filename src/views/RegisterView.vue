@@ -19,9 +19,12 @@
 </template>
 
 <script setup>
+
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useProfileStore } from '../stores/profile'
 import EmailVerificationModal from '../components/EmailVerificationModal.vue'
+
 
 const username = ref('')
 const password = ref('')
@@ -29,17 +32,30 @@ const error = ref('')
 const loading = ref(false)
 const showVerifyModal = ref(false)
 const auth = useAuthStore()
+const profileStore = useProfileStore()
 
 async function onRegister() {
   error.value = ''
   loading.value = true
   try {
     await auth.register(username.value, password.value)
+    // After registration, create the user profile
+    await profileStore.createProfile()
     loading.value = false
     showVerifyModal.value = true
   } catch (e) {
     loading.value = false
-    error.value = e?.message || 'Registration failed.'
+    // Log the full error for debugging
+    // eslint-disable-next-line no-console
+    console.error('Registration error:', e)
+    // Try to extract a detailed backend error message
+    if (e?.response?.data?.error) {
+      error.value = e.response.data.error
+    } else if (e?.message) {
+      error.value = e.message
+    } else {
+      error.value = 'Registration failed.'
+    }
   }
 }
 </script>
