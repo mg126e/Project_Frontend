@@ -7,6 +7,10 @@
         <input id="register-username" v-model="username" type="text" required />
       </div>
       <div class="form-group">
+        <label for="register-email">Email</label>
+        <input id="register-email" v-model="email" type="email" required />
+      </div>
+      <div class="form-group">
         <label for="register-password">Password</label>
         <input id="register-password" v-model="password" type="password" required />
       </div>
@@ -14,33 +18,45 @@
       <p v-if="error" class="error-msg">{{ error }}</p>
     </form>
     <p class="switch-link">Already have an account? <router-link to="/login">Login</router-link></p>
-    <EmailVerificationModal v-if="showVerifyModal" @close="showVerifyModal = false" />
+    <EmailVerificationModal
+      v-if="showVerifyModal"
+      @close="showVerifyModal = false"
+      @verified="handleVerified"
+    />
   </section>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import EmailVerificationModal from '../components/EmailVerificationModal.vue'
 
 const username = ref('')
+const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
 const showVerifyModal = ref(false)
 const auth = useAuthStore()
+const router = useRouter()
 
 async function onRegister() {
   error.value = ''
   loading.value = true
   try {
-    await auth.register(username.value, password.value)
+    await auth.register(username.value, password.value, email.value)
     loading.value = false
     showVerifyModal.value = true
   } catch (e) {
     loading.value = false
     error.value = e?.message || 'Registration failed.'
   }
+}
+
+function handleVerified() {
+  showVerifyModal.value = false
+  router.push('/dashboard')
 }
 </script>
 

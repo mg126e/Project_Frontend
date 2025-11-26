@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 interface User {
   id: string
   username: string
+  email?: string
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -46,11 +47,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const register = async (username: string, password: string): Promise<boolean> => {
+  const register = async (username: string, password: string, email?: string): Promise<boolean> => {
     try {
       const response = await ApiService.callConceptAction<
         { user: string; session: string } | { error: string }
-      >('PasswordAuthentication', 'register', { username, password })
+      >('PasswordAuthentication', 'register', {
+        username,
+        password,
+        ...(email ? { email } : {}),
+      })
 
       if ('error' in response) {
         throw new Error(response.error || 'Registration failed')
@@ -60,6 +65,7 @@ export const useAuthStore = defineStore('auth', () => {
       const userData = {
         id: userId,
         username: username,
+        ...(email ? { email } : {}),
       }
 
       user.value = userData

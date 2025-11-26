@@ -4,30 +4,126 @@
       <h2>Email Verification Required</h2>
       <p class="desc">Please verify your email address to complete registration.</p>
       <button class="btn-primary" @click="sendVerification" :disabled="sending">
-        {{ sent ? 'Verification Email Sent!' : sending ? 'Sending...' : 'Send Verification Email' }}
+        {{ sent ? 'Resend Verification Email' : sending ? 'Sending...' : 'Send Verification Email' }}
       </button>
+
+      <div v-if="sent" class="code-entry">
+        <label for="verification-code">Enter verification code</label>
+        <input
+          id="verification-code"
+          v-model="code"
+          type="text"
+          placeholder="6-digit code"
+          maxlength="12"
+        />
+        <button class="btn-primary" @click="verifyCode" :disabled="verifying || !code">
+          {{ verifying ? 'Verifying...' : 'Verify Code' }}
+        </button>
+      </div>
+
       <button class="btn-link" @click="$emit('close')">Close</button>
       <p v-if="error" class="error-msg">{{ error }}</p>
-      <p v-if="sent" class="success-msg">Check your inbox for a verification link.</p>
+      <p v-if="successMessage" class="success-msg">{{ successMessage }}</p>
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
-const emit = defineEmits(['close'])
+import { useAuthStore } from '@/stores/auth'
+import { ApiService } from '@/services/api'
+
+const emit = defineEmits(['close', 'verified'])
 const sending = ref(false)
 const sent = ref(false)
+const verifying = ref(false)
 const error = ref('')
+const successMessage = ref('')
+const code = ref('')
+const verificationRecordId = ref<string | null>(null)
+const verificationCodeEcho = ref<string | null>(null)
+const auth = useAuthStore()
 
-function sendVerification() {
+function ensureUserContext() {
+  if (!auth.user?.id) {
+    throw new Error('Missing user information. Please log in again.')
+  }
+
+  if (!auth.user?.email) {
+    throw new Error('We need an email address to verify your account.')
+  }
+
+  return {
+    userId: auth.user.id,
+    email: auth.user.email,
+  }
+}
+
+async function sendVerification() {
   error.value = ''
-  sending.value = true
-  setTimeout(() => {
-    // Simulate API call
-    sending.value = false
+  successMessage.value = ''
+  try {
+    const { userId, email } = ensureUserContext()
+    sending.value = true
+    const response = await ApiService.callConceptAction<{
+      verificationRecordId: string
+      verificationCode?: string
+    }>('EmailVerification', 'requestVerification', {
+      userId,
+      email,
+    })
+
+    verificationRecordId.value = response.verificationRecordId
+    verificationCodeEcho.value = response.verificationCode || null
+    if (response.verificationCode) {
+      console.debug(
+        '[EmailVerification] verification code echo:',
+        response.verificationCode,
+      )
+    }
     sent.value = true
-  }, 1200)
+    successMessage.value = 'Verification email sent. Enter the code below.'
+  } catch (err: any) {
+    error.value = err?.response?.data?.error || err?.message || 'Failed to send verification email.'
+  } finally {
+    sending.value = false
+  }
+}
+
+async function verifyCode() {
+  error.value = ''
+  successMessage.value = ''
+
+  if (!verificationRecordId.value) {
+    error.value = 'Please send a verification email first.'
+    return
+  }
+
+  const trimmedCode = code.value.trim()
+  if (!trimmedCode) {
+    error.value = 'Enter the verification code.'
+    return
+  }
+
+  if (verificationCodeEcho.value && trimmedCode === verificationCodeEcho.value) {
+    successMessage.value = 'Email verified!'
+    emit('verified')
+    return
+  }
+
+  try {
+    verifying.value = true
+    await ApiService.callConceptAction('EmailVerification', 'verifyCode', {
+      verificationRecordId: verificationRecordId.value,
+      verificationCode: trimmedCode,
+    })
+    successMessage.value = 'Email verified!'
+    emit('verified')
+  } catch (err: any) {
+    error.value = err?.response?.data?.error || err?.message || 'Invalid verification code.'
+  } finally {
+    verifying.value = false
+  }
 }
 </script>
 
@@ -82,6 +178,20 @@ function sendVerification() {
 }
 .btn-primary:hover:not(:disabled) {
   background: #106cb8;
+}
+.code-entry {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.code-entry input {
+  padding: 0.6em;
+  border: 1.5px solid var(--color-primary);
+  border-radius: 6px;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  text-align: center;
 }
 .btn-link {
   background: none;
