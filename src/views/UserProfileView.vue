@@ -1,7 +1,10 @@
 <template>
   <section class="profile-edit">
-    <h1>Edit Profile</h1>
-    <form v-if="isEditMode" @submit.prevent="saveProfile" class="profile-form">
+    <div v-if="loadingProfile" class="profile-loading">Loading profile...</div>
+    <template v-else>
+      <h1>Edit Profile</h1>
+      <div v-if="auth.user?.username" class="profile-username-top">@{{ auth.user.username }}</div>
+      <form v-if="isEditMode" @submit.prevent="saveProfile" class="profile-form">
       <div class="form-group">
         <label for="displayname">Display Name <span class="required-star">*</span></label>
         <input id="displayname" v-model="editForm.displayname" type="text" required />
@@ -92,9 +95,9 @@
         <button class="btn-primary" type="submit">Save Profile</button>
         <button class="btn-link" type="button" @click="cancelEdit">Cancel</button>
       </div>
-    </form>
+      </form>
 
-    <div v-else class="profile-view-grid">
+      <div v-else class="profile-view-grid">
       <div class="profile-view-main">
         <div class="profile-view-tags">
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Display Name</span><span class="profile-value">{{ profile.displayname }}</span></div>
@@ -129,19 +132,21 @@
       <button class="btn-primary" @click="startEdit" style="margin-top:1.5rem;">Edit Profile</button>
     </div>
 
-    <div v-if="isEditMode" class="change-password-trigger">
-      <button class="btn-link" @click="showPasswordModal = true">Change Password</button>
-      <button class="btn-link danger" @click="onDeleteUser">Delete Account</button>
-    </div>
 
-    <ChangePasswordModal
-      v-if="showPasswordModal"
-      :show="showPasswordModal"
-      @close="showPasswordModal = false"
-      @password-changed="onPasswordChanged"
-    />
-    <p v-if="passwordChangeMsg" class="success-msg">{{ passwordChangeMsg }}</p>
-    <p v-if="deleteMsg" :class="{'error-msg': deleteMsgType==='error', 'success-msg': deleteMsgType==='success'}">{{ deleteMsg }}</p>
+      <div class="change-password-trigger">
+        <button class="btn-link" @click="showPasswordModal = true">Change Password</button>
+        <button class="btn-link danger" @click="onDeleteUser">Delete Account</button>
+      </div>
+
+      <ChangePasswordModal
+        v-if="showPasswordModal"
+        :show="showPasswordModal"
+        @close="showPasswordModal = false"
+        @password-changed="onPasswordChanged"
+      />
+      <p v-if="passwordChangeMsg" class="success-msg">{{ passwordChangeMsg }}</p>
+      <p v-if="deleteMsg" :class="{'error-msg': deleteMsgType==='error', 'success-msg': deleteMsgType==='success'}">{{ deleteMsg }}</p>
+    </template>
   </section>
 </template>
 
@@ -241,7 +246,7 @@ function cancelEdit() {
   isEditMode.value = false;
 }
 
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import ChangePasswordModal from '../components/ChangePasswordModal.vue';
 import { useProfileStore } from '../stores/profile';
@@ -259,12 +264,16 @@ const { profile } = storeToRefs(profileStore);
 const emergencyPhoneError = ref(false);
 const passwordChangeMsg = ref('');
 
+const loadingProfile = ref(true);
 
 onMounted(async () => {
   await profileStore.fetchProfile();
+  if (profile.value.isActive === false) {
+    startEdit();
+  }
+  loadingProfile.value = false;
 });
 
-import { watch } from 'vue';
 // Watch for profile changes and trigger startEdit if inactive
 // Only trigger startEdit if profile is inactive AND has required fields (not empty)
 watch(profile, (newProfile) => {
@@ -425,14 +434,13 @@ function onPasswordChanged(msg) {
   margin: 3.5rem auto 0 auto;
   background: #fff;
   border-radius: 16px;
-  border: 1.5px solid #e3e8f0;
   padding: 2.5rem 3.5rem 2.2rem 3.5rem;
   position: relative;
 }
 .profile-edit h1 {
   color: var(--color-primary);
   font-size: 2.1rem;
-  margin-bottom: 2.1rem;
+  margin-bottom: .3rem;
   text-align: center;
   letter-spacing: 0.5px;
 }
@@ -441,13 +449,12 @@ function onPasswordChanged(msg) {
 }
 .profile-view-grid {
   margin-bottom: 2.2rem;
-  background: linear-gradient(120deg, #f7fafd 60%, #e3e8f0 100%);
   border-radius: 16px;
+  background: #e3f1fc;
   padding: 2.2rem 3.5rem 1.5rem 3.5rem;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  border: 1.5px solid #e3e8f0;
   min-width: 600px;
   max-width: 900px;
 }
@@ -495,8 +502,16 @@ function onPasswordChanged(msg) {
   border-radius: 50%;
   object-fit: cover;
   background: #fff;
-  border: 2.5px solid var(--color-primary);
 }
+
+.profile-username-top {
+  text-align: center;
+  font-size: 1.05rem;
+  color: var(--color-secondary);
+  margin-bottom: 2.0rem;
+  letter-spacing: 0.2px;
+}
+
 .profile-fallback-avatar-large {
   width: 130px;
   height: 130px;
@@ -698,3 +713,10 @@ function onPasswordChanged(msg) {
   text-align: center;
 }
 </style>
+
+.profile-loading {
+  text-align: center;
+  color: #888;
+  font-size: 1.1rem;
+  margin: 2.5rem 0 2.5rem 0;
+}

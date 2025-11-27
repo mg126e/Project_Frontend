@@ -29,10 +29,15 @@ const router = createRouter({
 			meta: { requiresGuest: true },
 		},
 		{
-			path: '/dashboard',
-			component: () => import('../views/DashboardLayout.vue'),
-			meta: { requiresAuth: true }, 
+			path: '/',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
 			children: [
+				{
+					path: 'dashboard',
+					name: 'dashboard-home',
+					component: () => import('../views/DashboardView.vue'),
+				},
 				{
 					path: 'profile',
 					name: 'profile',
@@ -109,7 +114,7 @@ router.beforeEach((to, from, next) => {
 		}
 		if (to.matched.some(record => record.meta.requiresGuest)) {
 			if (auth.user) {
-				return next({ path: '/dashboard/profile' });
+				return next({ path: '/dashboard' });
 			}
 		}
 	}

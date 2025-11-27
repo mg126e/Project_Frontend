@@ -4,70 +4,93 @@
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error-msg">{{ error }}</div>
     <div v-else>
-      <form @submit.prevent="saveGoal" class="goal-form">
-        <div class="form-group">
-          <label for="goal-title">Goal Title</label>
-          <input id="goal-title" v-model="goal.title" type="text" required />
-        </div>
-        <div class="form-group">
-          <label for="goal-desc">Description</label>
-          <textarea id="goal-desc" v-model="goal.description" rows="3" />
-        </div>
-        <button class="btn-primary" type="submit" :disabled="saving">Save</button>
-        <span v-if="saveSuccess" class="success-msg">Saved!</span>
+      <div class="goal-filters">
+        <label for="goal-filter" class="filter-label">Show:</label>
+        <select id="goal-filter" v-model="filter" class="filter-dropdown">
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      <ul v-if="filteredGoals.length">
+        <li v-for="goal in filteredGoals" :key="goal.id" class="goal-item">
+          <router-link :to="`/goal/${goal.id}`" class="goal-link">
+            {{ goal.description }}
+          </router-link>
+          <span v-if="!goal.isActive" class="inactive">(Closed)</span>
+        </li>
+      </ul>
+      <div v-else class="no-goals">No shared goals found.</div>
+      <form @submit.prevent="addGoal" class="goal-form" style="margin-top:2rem;">
+        <input v-model="description" placeholder="New goal description" required />
+        <button class="btn-primary" type="submit">Add Goal</button>
       </form>
     </div>
   </section>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { computed, ref, onMounted } from 'vue';
+import { useSharedGoalsStore } from '../stores/sharedGoals';
+import { storeToRefs } from 'pinia';
+import { useAuthStore } from '../stores/auth';
 
-// In a real app, get this from route, store, or props
-const sharedGoalId = 'demo-shared-goal-123'
-const goal = ref({ title: '', description: '' })
-const loading = ref(true)
-const error = ref('')
-const saving = ref(false)
-const saveSuccess = ref(false)
+const sharedGoalsStore = useSharedGoalsStore();
+const { sharedGoals, loading, error } = storeToRefs(sharedGoalsStore);
+const auth = useAuthStore();
+const description = ref('');
+const filter = ref('all'); // 'all' | 'active' | 'inactive'
 
-async function fetchGoal() {
-  loading.value = true
-  try {
-    const { data } = await axios.get(`/api/shared-goals/${sharedGoalId}`)
-    goal.value = data
-    error.value = ''
-  } catch (e) {
-    error.value = 'Failed to load shared goal.'
-  }
-  loading.value = false
+const filteredGoals = computed(() => {
+  if (filter.value === 'active') return sharedGoals.value.filter(g => g.isActive);
+  if (filter.value === 'inactive') return sharedGoals.value.filter(g => !g.isActive);
+  return sharedGoals.value;
+});
+
+onMounted(() => {
+  sharedGoalsStore.fetchSharedGoals([auth.user._id, 'demo-user-2']);
+});
+
+async function addGoal() {
+  await sharedGoalsStore.createSharedGoal({ users: [auth.user._id, 'demo-user-2'], description: description.value });
+  description.value = '';
+  await sharedGoalsStore.fetchSharedGoals([auth.user._id, 'demo-user-2']);
 }
-
-async function saveGoal() {
-  saving.value = true
-  saveSuccess.value = false
-  try {
-    await axios.put(`/api/shared-goals/${sharedGoalId}`, goal.value)
-    saveSuccess.value = true
-    setTimeout(() => (saveSuccess.value = false), 1200)
-    error.value = ''
-  } catch (e) {
-    error.value = 'Failed to save goal.'
-  }
-  saving.value = false
-}
-
-onMounted(fetchGoal)
 </script>
 
 <style scoped>
+.goal-filters {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 1.5rem;
+  gap: 0.7rem;
+}
+.filter-label {
+  font-weight: 600;
+  color: var(--color-primary);
+  font-size: 1rem;
+}
+.filter-dropdown {
+  background: #f7fafd;
+  color: var(--color-primary);
+  border: 1.5px solid #e3e8f0;
+  border-radius: 6px;
+  padding: 0.45em 1.2em 0.45em 0.8em;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: border 0.18s;
+  outline: none;
+}
+.filter-dropdown:focus {
+  border-color: #106cb8;
+}
 section.shared-goals {
-  max-width: 500px;
-  margin: 2.5rem auto;
+  min-width: 800px;
   background: #fff;
-  border-radius: 16px;
-  padding: 2rem 2.5rem;
+  border-radius: 24px;
+  padding: 3.5rem 4.5rem 3.5rem 4.5rem;
 }
 .shared-goals h1 {
   font-family: 'Monoton', cursive;
@@ -77,26 +100,40 @@ section.shared-goals {
   text-align: center;
 }
 .goal-form {
-  margin-top: 1.2rem;
-}
-.form-group {
-  margin-bottom: 1.2rem;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  gap: 0.7rem;
+  justify-content: center;
 }
-.form-group label {
+.goal-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.7em 0;
+  border-bottom: 1px solid #e3e8f0;
+  font-size: 1.1rem;
+}
+.goal-link {
+  color: var(--color-primary);
+  text-decoration: none;
   font-weight: 600;
-  margin-bottom: 0.3rem;
-}
-.form-group input,
-.form-group textarea {
-  width: 100%;
-  padding: 0.5em;
-  border: 1.5px solid var(--color-primary);
+  font-size: 1.1rem;
+  transition: color 0.18s, background 0.18s;
   border-radius: 6px;
-  font-size: 1rem;
-  margin-bottom: 0.2rem;
+  padding: 0.15em 0.5em;
+}
+.goal-link:hover {
+  background: #e3f1fc;
+  text-decoration: none;
+}
+.inactive {
+  color: #aaa;
+  font-size: 0.95em;
+  margin-left: 0.7em;
+}
+.no-goals {
+  text-align: center;
+  color: #888;
+  margin: 2rem 0;
 }
 .btn-primary {
   background: var(--color-primary);

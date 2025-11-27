@@ -12,3 +12,5 @@ app.use(createPinia())
 app.use(router)
 
 app.mount('#app')
+
+// Redirect logged-in users to dashboard/profile if they open the app and are already authenticated
