@@ -26,6 +26,9 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       ];
       this.loading = false;
     },
+    getGoalById(goalId: string) {
+      return this.sharedGoals.find(goal => goal.id === goalId);
+    },
     async createSharedGoal({ users, description }: { users: string[]; description: string }) {
       this.error = '';
       try {

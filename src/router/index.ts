@@ -74,7 +74,7 @@ const router = createRouter({
 					component: () => import('../views/SharedGoalsView.vue'),
 				},
 				{
-					path: 'goal/:id',
+					path: 'goals/:id',
 					name: 'goal-detail',
 					component: () => import('../views/GoalDetailView.vue'),
 				},

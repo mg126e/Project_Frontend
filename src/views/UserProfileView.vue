@@ -135,7 +135,7 @@
 
       <div class="change-password-trigger">
         <button class="btn-link" @click="showPasswordModal = true">Change Password</button>
-        <button class="btn-link danger" @click="onDeleteUser">Delete Account</button>
+        <button class="btn-link danger" @click="showDeleteModal = true">Delete Account</button>
       </div>
 
       <ChangePasswordModal
@@ -143,6 +143,15 @@
         :show="showPasswordModal"
         @close="showPasswordModal = false"
         @password-changed="onPasswordChanged"
+      />
+      <ConfirmActionModal
+        v-if="showDeleteModal"
+        title="Delete Account"
+        message="Are you sure you want to delete your account? This cannot be undone."
+        confirmText="Delete"
+        confirmClass="danger"
+        @close="showDeleteModal = false"
+        @confirm="handleDeleteUser"
       />
       <p v-if="passwordChangeMsg" class="success-msg">{{ passwordChangeMsg }}</p>
       <p v-if="deleteMsg" :class="{'error-msg': deleteMsgType==='error', 'success-msg': deleteMsgType==='success'}">{{ deleteMsg }}</p>
@@ -152,7 +161,9 @@
 
 <script setup>
 
-// Helper to cache download URLs for file IDs
+import ConfirmActionModal from '../components/ConfirmActionModal.vue';
+
+const showDeleteModal = ref(false);
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 const FILE_API_BASE = API_BASE.endsWith('/api') ? API_BASE.slice(0, -4) : API_BASE;
 const downloadUrlCache = {};
@@ -402,16 +413,16 @@ async function saveProfile() {
   }
 }
 
-async function onDeleteUser() {
-  if (confirm('Are you sure you want to delete your account? This cannot be undone.')) {
-    const result = await auth.deleteUser();
-    if (result === true) {
-      deleteMsg.value = 'Account deleted. You have been logged out.';
-      deleteMsgType.value = 'success';
-    } else {
-      deleteMsg.value = result || 'Failed to delete account.';
-      deleteMsgType.value = 'error';
-    }
+
+async function handleDeleteUser() {
+  showDeleteModal.value = false;
+  const result = await auth.deleteUser();
+  if (result === true) {
+    deleteMsg.value = 'Account deleted. You have been logged out.';
+    deleteMsgType.value = 'success';
+  } else {
+    deleteMsg.value = result || 'Failed to delete account.';
+    deleteMsgType.value = 'error';
   }
 }
 
@@ -713,10 +724,3 @@ function onPasswordChanged(msg) {
   text-align: center;
 }
 </style>
-
-.profile-loading {
-  text-align: center;
-  color: #888;
-  font-size: 1.1rem;
-  margin: 2.5rem 0 2.5rem 0;
-}

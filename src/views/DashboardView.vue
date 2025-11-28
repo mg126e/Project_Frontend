@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard-home">
     <h1>Welcome{{ displayName ? `, ${displayName}` : '' }}!</h1>
-    <p class="dashboard-welcome-msg">This is your dashboard. Here you can see your important stats and quick links.</p>
+    <p class="dashboard-welcome-msg">Check out your important stats!</p>
     <div class="dashboard-stats">
       <div class="stat-card">
         <div class="stat-label">Total Goals</div>
