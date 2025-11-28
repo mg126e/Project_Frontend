@@ -71,7 +71,6 @@
 
 <script setup>
 import { ref } from 'vue';
-import axios from 'axios';
 import { useSharedGoalsStore } from '../stores/sharedGoals';
 import { useAuthStore } from '../stores/auth';
 import draggable from 'vuedraggable';
@@ -89,6 +88,7 @@ const validationError = ref('');
 const generationError = ref('');
 const generating = ref(false);
 const saving = ref(false);
+const goalIdRef = ref(null); // Store created goalId for later use
 
 function resetModalState() {
   step.value = 1;
@@ -143,10 +143,17 @@ async function chooseMethod(selected) {
   steps.value = [];
   if (selected === 'generate') {
     try {
-      // Simulate LLM API call
-      const { data } = await axios.post('/api/llm/generate-goal-steps', { description: goalDescription.value });
-      if (data && Array.isArray(data.steps)) {
-        steps.value = data.steps.map((desc, idx) => ({ id: idx, description: desc }));
+      // Always use the unique string id of the user
+      const users = [auth.user.id, "019ac21f-956d-7768-b714-34751200b213"];
+      const goalId = await sharedGoalsStore.createSharedGoal({ users, description: goalDescription.value });
+      goalIdRef.value = goalId;
+      const generated = await sharedGoalsStore.generateSharedSteps({ sharedGoal: goalId, user: auth.user.id });
+      if (Array.isArray(generated)) {
+        steps.value = generated.map((desc, idx) => ({ id: idx, description: desc.description || desc }));
+      } else if (Array.isArray(sharedGoalsStore.steps)) {
+        steps.value = sharedGoalsStore.steps.map((s, idx) => ({ id: idx, description: s.description }));
+      }
+      if (steps.value.length > 0) {
         step.value = 2;
       } else {
         generationError.value = 'Could not generate steps.';
@@ -163,10 +170,30 @@ async function chooseMethod(selected) {
 }
 async function saveGoal() {
   if (saving.value) return;
+  if (!auth.user || !auth.user.id || typeof auth.user.id !== 'string') {
+    generationError.value = 'User ID is missing or invalid. Please log in again.';
+    saving.value = false;
+    return;
+  }
   saving.value = true;
   try {
-    // Save goal and steps (mock: just save goal description)
-    await sharedGoalsStore.createSharedGoal({ users: [auth.user._id, 'demo-user-2'], description: goalDescription.value });
+    const goalId = goalIdRef.value;
+    if (!goalId) {
+      generationError.value = 'Goal ID is missing. Cannot save steps.';
+      saving.value = false;
+      return;
+    }
+    // Remove all existing steps for this goal (if any)
+    await sharedGoalsStore.fetchSharedSteps(goalId);
+    if (Array.isArray(sharedGoalsStore.steps)) {
+      for (const stepObj of sharedGoalsStore.steps) {
+        await sharedGoalsStore.removeSharedStep({ step: stepObj.id, user: auth.user.id, sharedGoal: goalId });
+      }
+    }
+    // Add all reviewed steps
+    for (const stepObj of steps.value) {
+      await sharedGoalsStore.addSharedStep({ sharedGoal: goalId, description: stepObj.description, user: auth.user.id });
+    }
     emit('goalCreated');
     resetModalState();
   } catch (e) {
@@ -343,7 +370,6 @@ async function saveGoal() {
 .primary-button:hover:not(:disabled) {
   background: #d84315;
 }
-
 .drag-handle {
   color: var(--color-secondary);
   font-size: 1.2em;

@@ -154,17 +154,12 @@ async function loadGoal() {
   loading.value = true;
   const goalId = route.params.id;
   goal.value = await sharedGoalsStore.getGoalById(goalId);
-  let loadedSteps = goal.value?.steps || [];
-  // Inject fake steps for UI testing if no steps exist
-  if (!loadedSteps.length) {
-    loadedSteps = [
-      { id: 1, description: 'Buy new running shoes', isComplete: false },
-      { id: 2, description: 'Run 1 mile as a warmup', isComplete: true, completion: new Date() },
-      { id: 3, description: 'Stretch for 10 minutes', isComplete: false },
-      { id: 4, description: 'Run 5K with buddy', isComplete: false }
-    ];
+  if (goal.value) {
+    await sharedGoalsStore.getSharedSteps(goalId);
+    steps.value = Array.isArray(sharedGoalsStore.steps) ? sharedGoalsStore.steps : [];
+  } else {
+    steps.value = [];
   }
-  steps.value = loadedSteps;
   loading.value = false;
 }
 
