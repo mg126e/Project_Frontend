@@ -15,7 +15,7 @@
           </span>
         </div>
       </div>
-      <router-link to="/goals" class="back-link">&larr; Back to Shared Goals</router-link>
+      <router-link to="/goals" class="back-link">Back to Shared Goals</router-link>
     </div>
   </section>
 </template>
@@ -40,7 +40,6 @@ const goal = computed(() => sharedGoals.value.find(g => g.id === route.params.id
   background: #fff;
   border-radius: 20px;
   padding: 3rem 3.5rem;
-  box-shadow: 0 4px 32px 0 rgba(0,0,0,0.07);
 }
 .goal-detail h1 {
   color: var(--color-primary);
@@ -76,11 +75,14 @@ const goal = computed(() => sharedGoals.value.find(g => g.id === route.params.id
   text-decoration: none;
   font-weight: 600;
   font-size: 1.05rem;
-  transition: color 0.18s;
+  transition: color 0.18s, background 0.18s;
+  border-radius: 6px;
+  padding: 0.15em 0.5em;
 }
 .back-link:hover {
+  background: #e3f1fc;
   color: #106cb8;
-  text-decoration: underline;
+  text-decoration: none;
 }
 .loading {
   text-align: center;

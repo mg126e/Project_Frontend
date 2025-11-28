@@ -3,12 +3,12 @@
     <nav class="topbar">
       <h1>RunBuddy</h1>
       <ul>
-        <li><router-link to="dashboard">Dashboard</router-link></li>
-        <li><router-link to="profile">Profile</router-link></li>
-        <li><router-link to="goals">Shared Goals</router-link></li>
-        <li><router-link to="milestones">Milestones</router-link></li>
-        <li><router-link to="messages">Messages</router-link></li>
-        <li><router-link to="matches">Matches</router-link></li>
+        <li><router-link to="/dashboard">Dashboard</router-link></li>
+        <li><router-link to="/profile">Profile</router-link></li>
+        <li><router-link to="/goals">Shared Goals</router-link></li>
+        <li><router-link to="/milestones">Milestones</router-link></li>
+        <li><router-link to="/messages">Messages</router-link></li>
+        <li><router-link to="/matches">Matches</router-link></li>
       </ul>
       <button class="topbar-logout" @click="onLogout">Logout</button>
     </nav>
@@ -73,9 +73,8 @@ export default {
   transition: background 0.18s, color 0.18s;
   display: block;
 }
-.topbar a.router-link-exact-active,
-.topbar a.router-link-active {
-  background: #e3e8f0;
+.topbar a:hover {
+  background: #e3f1fc;
   color: #106cb8;
 }
 .dashboard-main {
@@ -88,7 +87,7 @@ export default {
   max-width: 100%;
 }
 .topbar-logout {
-  background: #ff7043;
+  background: var(--color-accent);
   color: #fff;
   border: none;
   border-radius: 6px;
