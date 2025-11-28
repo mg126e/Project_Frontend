@@ -13,11 +13,9 @@
         <div class="goal-info">
           <h2>{{ goal.description }}</h2>
           <div class="goal-meta">
-            <span class="goal-status">{{ goal.isActive ? 'Active Goal' : 'Closed Goal' }}</span>
+            <span class="goal-status">{{ goal.isActive ? 'Active' : 'Closed' }}</span>
             <span class="step-count">{{ steps.length }} steps</span>
-          </div>
-          <div v-if="goal.createdAt" class="goal-start-date">
-            Started at: {{ formatDate(goal.createdAt) }}
+            Started: {{ formatDate(goal.createdAt) }}
           </div>
           <div v-if="!goal.isActive && (goal.completedAt || goal.completed || goal.completed_at)" class="goal-completed-date">
             Completed at: {{ formatDate(goal.completedAt || goal.completed || goal.completed_at) }}
@@ -55,7 +53,7 @@
           <p>No steps have been created for this goal.</p>
         </div>
         <div v-else class="steps-list">
-          <div v-for="(step, index) in steps" :key="step.id" class="step-item" :class="{ completed: step.isComplete, 'next-step': !step.isComplete && isNextStep(index) }">
+          <div v-for="(step, index) in steps" :key="step.id" class="step-item" :class="{ completed: !!step.completion, 'next-step': !step.completion && isNextStep(index) }">
             <div class="step-number">{{ index + 1 }}</div>
             <div class="step-content">
               <h4>{{ step.description }}</h4>
@@ -64,7 +62,7 @@
               </div>
             </div>
             <div class="step-actions" v-if="goal.isActive">
-              <button v-if="!step.isComplete && step.id && goal.isActive" @click="completeStep(step.id)" class="complete-button">✓ Complete</button>
+              <button v-if="!step.completion && step.id && goal.isActive" @click="completeStep(step.id)" class="complete-button">✓ Complete</button>
               <span v-else class="completed-icon">✅</span>
             </div>
           </div>
@@ -107,6 +105,7 @@
 import ConfirmActionModal from '../components/ConfirmActionModal.vue';
 const showAbandonModal = ref(false);
 import { ref, computed, onMounted } from 'vue';
+import { useAuthStore } from '../stores/auth';
 import { useRoute, useRouter } from 'vue-router';
 import { useSharedGoalsStore } from '../stores/sharedGoals';
 import { format } from 'date-fns';
@@ -114,38 +113,52 @@ import { format } from 'date-fns';
 const route = useRoute();
 const router = useRouter();
 const sharedGoalsStore = useSharedGoalsStore();
+const auth = useAuthStore();
 
 const goal = ref(null);
 const steps = ref([]);
 const loading = ref(true);
 
-const completedSteps = computed(() => steps.value.filter(s => s.isComplete).length);
+const completedSteps = computed(() => steps.value.filter(s => !!s.completion).length);
 const remainingSteps = computed(() => steps.value.length - completedSteps.value);
 const goalProgress = computed(() => steps.value.length ? Math.round((completedSteps.value / steps.value.length) * 100) : 0);
 
 function formatDate(date) {
   if (!date) return '';
-  return format(new Date(date), 'PPpp');
+  // Format: Nov 27, 2025, 3:45 PM (no seconds)
+  return format(new Date(date), 'PP p');
 }
 
 function isNextStep(index) {
   for (let i = 0; i < steps.value.length; i++) {
-    if (!steps.value[i].isComplete) {
+    if (!steps.value[i].completion) {
       return i === index;
     }
   }
   return false;
 }
 
+
 async function completeStep(stepId) {
-  await sharedGoalsStore.completeStep(goal.value.id, stepId);
-  await loadGoal();
+  if (!goal.value || !goal.value.id || !stepId) return;
+  await sharedGoalsStore.completeSharedStep({
+    step: stepId,
+    user: auth.user.id,
+    sharedGoal: goal.value.id
+  });
+  // Update local state for immediate UI feedback
+  const stepIdx = steps.value.findIndex(s => s.id === stepId);
+  if (stepIdx !== -1) {
+    steps.value[stepIdx].completion = new Date().toISOString();
+  }
 }
 
 
 async function handleAbandonGoal() {
   showAbandonModal.value = false;
-  await sharedGoalsStore.abandonGoal(goal.value.id);
+  if (goal.value && auth.user && auth.user.id) {
+    await sharedGoalsStore.closeSharedGoal({ sharedGoal: goal.value.id, user: auth.user.id });
+  }
   router.push('/goals');
 }
 
@@ -153,7 +166,7 @@ async function handleAbandonGoal() {
 async function loadGoal() {
   loading.value = true;
   const goalId = route.params.id;
-  goal.value = await sharedGoalsStore.getGoalById(goalId);
+  goal.value = await sharedGoalsStore.fetchSharedGoalById([auth.user.id, "019ac21f-956d-7768-b714-34751200b213"], goalId);
   if (goal.value) {
     await sharedGoalsStore.getSharedSteps(goalId);
     steps.value = Array.isArray(sharedGoalsStore.steps) ? sharedGoalsStore.steps : [];
@@ -368,7 +381,7 @@ onMounted(loadGoal);
   margin-bottom: 1rem;
 }
 .achievement-card h3 {
-  color: var(--color-primary);
+  color: #c5a12d;
   margin: 0 0 1rem 0;
   font-size: 1.8rem;
 }

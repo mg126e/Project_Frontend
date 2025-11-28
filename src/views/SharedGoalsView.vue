@@ -12,20 +12,34 @@
           <option value="inactive">Inactive</option>
         </select>
       </div>
-      <ul v-if="filteredGoals.length">
-        <li v-for="(goal, idx) in filteredGoals" :key="goal.id" class="goal-item">
-          <router-link :to="`/goals/${goal.id}`" class="goal-link">
-            {{ goal.description }}
-          </router-link>
-          <span v-if="!goal.isActive" class="inactive">(Closed)</span>
-        </li>
-      </ul>
-      <div v-else class="no-goals">No shared goals found.</div>
+
+
+
+      <div v-for="user in userGroupsForCollapsible" :key="user.id" class="user-collapsible">
+        <div class="user-header" @click="toggleUser(user.id)">
+ <span class="user-name">{{ user.displayname}}</span>
+  <span class="collapse-arrow">{{ openUsers[user.id] ? '▼' : '▶' }}</span>
+</div>
+        <transition name="fade">
+          <ul v-show="openUsers[user.id]" class="user-goal-list">
+            <li v-for="goal in user.goals" :key="goal.id" class="goal-item">
+              <router-link :to="`/goals/${goal.id}`" class="goal-link">
+                {{ goal.description }}
+              </router-link>
+              <span v-if="!goal.isActive" class="inactive">(Closed)</span>
+            </li>
+          </ul>
+        </transition>
+      </div>
+
+
+      <div v-if="filteredGoals.length === 0" class="no-goals">No shared goals found.</div>
       <button class="btn-primary" style="margin-top:2rem;" @click="showGoalModal = true">Add Goal</button>
       <GoalCreationModal v-if="showGoalModal" @close="showGoalModal = false" @goalCreated="onGoalCreated" />
     </div>
-  </section>
-</template>
+
+      </section>
+    </template>
 
 <script setup>
 import GoalCreationModal from '../components/GoalCreationModal.vue';
@@ -47,114 +61,60 @@ const filteredGoals = computed(() => {
   return sharedGoals.value;
 });
 
+// Group shared goals by each individual user (other than self)
+const userGroupsForCollapsible = computed(() => {
+  const userMap = {};
+  filteredGoals.value.forEach(goal => {
+    (goal.users || []).forEach(u => {
+      const id = typeof u === 'object' ? u.id : u;
+      // Always use the best available displayname (store guarantees fallback to id)
+      const displayname = typeof u === 'object' ? u.displayname : u;
+      if (id && id !== auth.user.id) {
+        if (!userMap[id]) {
+          userMap[id] = { id, displayname, goals: [] };
+        }
+        userMap[id].goals.push(goal);
+      }
+    });
+  });
+  // Sort by name for consistent order
+  return Object.values(userMap).sort((a, b) => a.displayname.localeCompare(b.displayname));
+});
+
+
+// Initialize open state for the first group and reset on group changes
+import { watch, reactive } from 'vue';
+const openUsers = reactive({});
+let prevIds = [];
+watch(userGroupsForCollapsible, (groups) => {
+  const ids = groups.map(g => g.id);
+  // Only reset if the user ids actually changed
+  if (ids.join('|') !== prevIds.join('|')) {
+    // Remove all keys from openUsers
+    Object.keys(openUsers).forEach(k => delete openUsers[k]);
+    if (groups.length > 0) {
+      openUsers[groups[0].id] = true;
+    }
+    prevIds = ids;
+  }
+});
+
+function toggleUser(userId) {
+  openUsers[userId] = !openUsers[userId];
+}
+
+
 onMounted(() => {
-  sharedGoalsStore.fetchSharedGoals([auth.user._id, 'demo-user-2']);
+  sharedGoalsStore.fetchAllSharedGoalsForUser(auth.user.id);
 });
 
 function onGoalCreated() {
   showGoalModal.value = false;
-  sharedGoalsStore.fetchSharedGoals([auth.user._id, 'demo-user-2']);
+  sharedGoalsStore.fetchAllSharedGoalsForUser(auth.user.id);
 }
 </script>
 
 <style scoped>
-/* Modal styles (from GoalCreationModal.vue, simplified) */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-.modal-content {
-  background: #f6fff7;
-  border-radius: 16px;
-  width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  border: 1.5px solid #81c784;
-}
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 1.5rem 1rem 1.5rem;
-  border-bottom: 1px solid #81c784;
-  background: #e8f5e9;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-}
-.modal-header h2 {
-  margin: 0;
-  color: #256b28;
-  font-size: 1.5rem;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-}
-.close-button {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: #256b28;
-  cursor: pointer;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background 0.2s;
-}
-.close-button:hover {
-  background: #e0f2f1;
-  color: #256b28;
-}
-.modal-body {
-  padding: 1.5rem;
-}
-.modal-body label {
-  color: #256b28;
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-  display: block;
-}
-.modal-body textarea,
-.modal-body input {
-  width: 100%;
-  border-radius: 8px;
-  border: 1.5px solid #81c784;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
-  background: #f6fff7;
-  color: #256b28;
-  transition: border-color 0.2s;
-}
-.modal-body textarea:focus,
-.modal-body input:focus {
-  outline: none;
-  border-color: #256b28;
-}
-.form-help {
-  color: #256b28;
-  margin-bottom: 1rem;
-  font-size: 0.95rem;
-  background: #e8f5e9;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-}
-.choose-method {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-}
 .steps-list {
   list-style: none;
   padding: 0;
@@ -171,70 +131,7 @@ function onGoalCreated() {
   border: 1px solid #e0f2f1;
   box-shadow: none;
 }
-.delete-step {
-  background: #388e3c;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 0.25rem 0.75rem;
-  cursor: pointer;
-  font-size: 0.95rem;
-  font-weight: 500;
-  transition: background 0.2s;
-}
-.delete-step:hover {
-  background: #256b28;
-}
-.next-button,
-.primary-button {
-  background: #388e3c;
-  color: #fff;
-  border: none;
-  padding: 0.85rem 1.5rem;
-  border-radius: 8px;
-  font-size: 1rem;
-  cursor: pointer;
-  font-weight: 500;
-  box-shadow: none;
-  transition: background 0.2s;
-}
-.next-button:disabled,
-.primary-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.next-button:hover,
-.primary-button:hover {
-  background: #256b28;
-}
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #a5d6a7;
-  border-top: 4px solid #388e3c;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 2rem auto;
-}
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-.edit-step-input {
-  border: 1.5px solid #81c784;
-  border-radius: 6px;
-  padding: 0.4em 0.7em;
-  font-size: 1em;
-  background: #f6fff7;
-  color: #256b28;
-  flex: 1;
-  min-width: 0;
-}
-.edit-step-input:focus {
-  outline: none;
-  border-color: #256b28;
-  background: #fff;
-}
+
 .error-message {
   color: #d32f2f;
   margin-top: 0.25em;
@@ -313,7 +210,6 @@ section.shared-goals {
 .inactive {
   color: #aaa;
   font-size: 0.95em;
-  margin-left: 0.7em;
 }
 .no-goals {
   text-align: center;
@@ -355,5 +251,36 @@ section.shared-goals {
   color: #388e3c;
   margin-left: 1.2rem;
   font-size: 1rem;
+}
+
+.user-collapsible {
+  margin-bottom: 1.2rem;
+  background: #f9fafb;
+}
+.user-header {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 1.1rem 1.2rem 1.1rem 1.2rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: #e3f1fc;
+  transition: background 0.18s;
+}
+.user-header:hover {
+  background: #d0e4f0;
+}
+.user-name {
+  flex: 1;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+.collapse-arrow {
+  font-size: 1.2rem;
+  margin-left: 0.7rem;
+  color: var(--color-primary);
+  font-weight: 700;
 }
 </style>

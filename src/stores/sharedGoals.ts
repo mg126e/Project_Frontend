@@ -1,10 +1,16 @@
 import { defineStore } from 'pinia';
 import { ApiService } from '@/services/api';
 
+export interface SharedGoalUser {
+  id: string;
+  name?: string;
+}
+
 export interface SharedGoal {
   id: string;
   description: string;
   isActive: boolean;
+  users: SharedGoalUser[];
 }
 
 export interface SharedStep {
@@ -22,16 +28,25 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
     error: '',
   }),
   actions: {
-    async fetchSharedGoals(users: string[], isActive?: boolean) {
+
+    // New: Fetch all shared goals for a user
+    async fetchAllSharedGoalsForUser(user: string) {
       this.loading = true;
       this.error = '';
       try {
-        const response = await ApiService.callConceptAction<any>('SharedGoals', '_getSharedGoals', { users, isActive });
+        // Call the new backend method (update backend to support this!)
+        const response = await ApiService.callConceptAction<any>('SharedGoals', 'getAllGoalsForUser', { user });
         this.sharedGoals = Array.isArray(response)
           ? response.map((g: any) => ({
-              id: g.id,
+              id: g._id, // use _id from backend
               description: g.description,
               isActive: g.isActive,
+              users: Array.isArray(g.users)
+                ? g.users.map((u: any) => ({
+                    id: u.id || u._id || u,
+                    displayname: u.displayname || undefined,
+                  }))
+                : [],
             }))
           : [];
       } catch (err: any) {
@@ -39,10 +54,6 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       } finally {
         this.loading = false;
       }
-    },
-
-    getGoalById(goalId: string) {
-      return this.sharedGoals.find(goal => goal.id === goalId) || null;
     },
 
     async fetchSharedGoalById(users: string[], sharedGoalId: string) {
@@ -65,7 +76,10 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       try {
         const response = await ApiService.callConceptAction<any>('SharedGoals', 'createSharedGoal', { users, description });
         if (response.error) throw new Error(response.error);
-        await this.fetchSharedGoals(users);
+        // After creating, fetch all shared goals for the current user (assume first user is current)
+        if (Array.isArray(users) && typeof users[0] === 'string') {
+          await this.fetchAllSharedGoalsForUser(users[0]);
+        }
         return response.sharedGoalId;
       } catch (err: any) {
         this.error = err.message || 'Failed to create shared goal.';
@@ -75,13 +89,12 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       }
     },
 
-    async closeSharedGoal({ sharedGoal, user, users }: { sharedGoal: string; user: string; users: string[] }) {
+    async closeSharedGoal({ sharedGoal, user }: { sharedGoal: string; user: string }) {
       this.loading = true;
       this.error = '';
       try {
         const response = await ApiService.callConceptAction<any>('SharedGoals', 'closeSharedGoal', { sharedGoal, user });
         if (response.error) throw new Error(response.error);
-        await this.fetchSharedGoals(users);
       } catch (err: any) {
         this.error = err.message || 'Failed to close shared goal.';
         throw err;
@@ -167,6 +180,11 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
         const response = await ApiService.callConceptAction<any>('SharedGoals', 'completeSharedStep', { step, user });
         if (response.error) throw new Error(response.error);
         await this.fetchSharedSteps(sharedGoal);
+        // If all steps are now completed, close the goal
+        const allComplete = this.steps.length > 0 && this.steps.every(s => !!s.completion);
+        if (allComplete) {
+          await this.closeSharedGoal({ sharedGoal, user });
+        }
       } catch (err: any) {
         this.error = err.message || 'Failed to complete shared step.';
         throw err;

@@ -27,7 +27,7 @@ function onClose() {
   emit('close');
 }
 function onConfirm() {
-  emit('confirm');
+  emit('confirm'); // Only emit confirm when confirm button is clicked
 }
 </script>
 
@@ -50,7 +50,6 @@ function onConfirm() {
   max-width: 400px;
   width: 100%;
   padding: 2rem 1.5rem 1.5rem 1.5rem;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
 }
 .modal-header {
   display: flex;
