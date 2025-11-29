@@ -441,7 +441,7 @@ function onPasswordChanged(msg) {
   vertical-align: middle;
 }
 .profile-edit {
-  max-width: 900px;
+  width: 700px;
   margin: 3.5rem auto 0 auto;
   background: #fff;
   border-radius: 16px;

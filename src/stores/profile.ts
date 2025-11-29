@@ -46,9 +46,9 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true;
     error.value = '';
     try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', '_getProfile', { user: userId });
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
+      const result = await ApiService.callConceptAction('UserProfile', '_getProfile', { session });
       console.log('result:', result);
       if (result && !result.error) {
         const merged = await mergeProfile(result as UserProfile);
@@ -120,9 +120,9 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true;
     error.value = '';
     try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', 'createProfile', { user: userId });
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
+      const result = await ApiService.callConceptAction('UserProfile', 'createProfile', { session });
       if (result && !result.error) {
         await fetchProfile();
       } else {
@@ -139,9 +139,9 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true;
     error.value = '';
     try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      const payload = { user: userId, displayname };
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
+      const payload = { session, displayname };
       console.log('[updateDisplayName] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setName', payload);
       if (result && result.error) {
@@ -159,6 +159,8 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true;
     error.value = '';
     try {
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
       const userId = getUserId();
       if (!userId) throw new Error('User not found');
       // 1. Request upload URL
@@ -183,7 +185,7 @@ export const useProfileStore = defineStore('profile', () => {
         throw new Error(confirmRes?.error || 'Failed to confirm upload');
       }
       // 4. Save fileId in profile (setProfileImage)
-      const result = await ApiService.callConceptAction('UserProfile', 'setProfileImage', { user: userId, image: fileId });
+      const result = await ApiService.callConceptAction('UserProfile', 'setProfileImage', { session, image: fileId });
       if (result && !result.error) {
         // Always re-fetch the profile to ensure the image is resolved and state is in sync
         await fetchProfile();
@@ -202,9 +204,9 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true;
     error.value = '';
     try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      const payload = { user: userId, bio };
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
+      const payload = { session, bio };
       console.log('[updateBio] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setBio', payload);
       if (result && result.error) {
@@ -222,9 +224,9 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true;
     error.value = '';
     try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      const payload = { user: userId, location };
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
+      const payload = { session, location };
       console.log('[updateLocation] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setLocation', payload);
       if (result && result.error) {
@@ -242,9 +244,9 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true;
     error.value = '';
     try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      const payload = { user: userId, name, phone };
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
+      const payload = { session, name, phone };
       console.log('[updateEmergencyContact] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setEmergencyContact', payload);
       if (result && result.error) {
@@ -262,9 +264,9 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true;
     error.value = '';
     try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      const payload = { user: userId, tagType, value };
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
+      const payload = { session, tagType, value };
       console.log('[updateTag] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setTag', payload);
       if (result && result.error) {
@@ -281,9 +283,9 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true;
     error.value = '';
     try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      const payload = { user: userId, isActive };
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
+      const payload = { session, isActive };
       const result = await ApiService.callConceptAction('UserProfile', 'setIsActive', payload);
       if (result && result.error) {
         error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update isActive.';
@@ -305,9 +307,9 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true;
     error.value = '';
     try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', 'closeProfile', { user: userId });
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
+      const result = await ApiService.callConceptAction('UserProfile', 'closeProfile', { session });
       if (result && result.error) {
         error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to close profile.';
         throw new Error(error.value);

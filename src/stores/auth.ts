@@ -28,120 +28,113 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Actions
-  const login = async (username: string, password: string): Promise<boolean> => {
-    try {
-      const response = await ApiService.callConceptAction<
-        { user: string; session: string } | { error: string }
-      >('PasswordAuthentication', 'authenticate', { username, password })
+const login = async (username: string, password: string): Promise<boolean> => {
+  try {
+    const response = await ApiService.post<
+      { user: string; session: string } | { error: string }
+    >('/PasswordAuthentication/authenticate', { username, password })
 
-      if ('error' in response) {
-        return false
-      }
-
-      const { user: userId, session: sessionToken } = response
-      const userData = {
-        id: userId,
-        username: username,
-      }
-
-      user.value = userData
-      session.value = sessionToken
-      setToStorage('user', userData)
-      setToStorage('session', sessionToken)
-
-      return true
-    } catch (error) {
+    if ('error' in response) {
       return false
     }
-  }
 
-  const register = async (username: string, password: string, email?: string): Promise<boolean> => {
+    const { user: userId, session: sessionToken } = response
+    const userData = {
+      id: userId,
+      username: username,
+    }
+
+    user.value = userData
+    session.value = sessionToken
+    setToStorage('user', userData)
+    setToStorage('session', sessionToken)
+
+    return true
+  } catch (error) {
+    return false
+  }
+}
+
+const register = async (username: string, password: string, email?: string): Promise<boolean> => {
+  try {
+    const response = await ApiService.post<
+      { user: string; session: string } | { error: string }
+    >('/PasswordAuthentication/register', {
+      username,
+      password,
+      ...(email ? { email } : {}),
+    })
+
+    if ('error' in response) {
+      throw new Error(response.error || 'Registration failed')
+    }
+
+    const { user: userId, session: sessionToken } = response
+    const userData = {
+      id: userId,
+      username: username,
+      ...(email ? { email } : {}),
+    }
+
+    user.value = userData
+    session.value = sessionToken
+    setToStorage('user', userData)
+    setToStorage('session', sessionToken)
+
+    // Profile is auto-created by backend sync, just fetch it
     try {
-      const response = await ApiService.callConceptAction<
-        { user: string; session: string } | { error: string }
-      >('PasswordAuthentication', 'register', {
-        username,
-        password,
-        ...(email ? { email } : {}),
-      })
-
-      if ('error' in response) {
-        throw new Error(response.error || 'Registration failed')
-      }
-
-      const { user: userId, session: sessionToken } = response
-      const userData = {
-        id: userId,
-        username: username,
-        ...(email ? { email } : {}),
-      }
-
-      user.value = userData
-      session.value = sessionToken
-      setToStorage('user', userData)
-      setToStorage('session', sessionToken)
-
-      // Fetch user profile after registration (auto-creates if missing)
-      try {
-        // Dynamically import to avoid circular dependency
-        const { useProfileStore } = await import('@/stores/profile');
-        const profileStore = useProfileStore();
-        await profileStore.fetchProfile();
-      } catch (e) {
-        // Log but do not block registration if profile fetch/creation fails
-        console.error('Failed to fetch/create profile after registration:', e);
-      }
-
-      return true
-    } catch (error) {
-      throw error
+      const { useProfileStore } = await import('@/stores/profile');
+      const profileStore = useProfileStore();
+      await profileStore.fetchProfile();
+    } catch (e) {
+      console.error('Failed to fetch profile after registration:', e);
     }
+
+    return true
+  } catch (error) {
+    throw error
   }
+}
 
-  const logout = async () => {
-    // Redirect to login page first
-    if (router.currentRoute.value.path !== '/login') {
-      await router.push('/login')
+const logout = async () => {
+  try {
+    if (session.value) {
+      await ApiService.post('/logout', { session: session.value })
     }
-    // Now clear user/session after navigation
+  } catch (e) {
+    console.error('Logout error:', e)
+  } finally {
     user.value = null
     session.value = null
     removeFromStorage('user')
     removeFromStorage('session')
-  }
-
-  const changePassword = async (oldPassword: string, newPassword: string): Promise<true | string> => {
-    try {
-      if (!user.value?.id) {
-        return 'User not found.';
-      }
-      const response = await ApiService.callConceptAction<any>(
-        'PasswordAuthentication', 'changePassword', {
-        user: user.value.id,
-        oldPassword,
-        newPassword,
-      });
-      // Accept various success shapes, or empty/undefined response
-      if (
-        response === undefined || response === null ||
-        (typeof response === 'object' && (
-          Object.keys(response).length === 0 ||
-          response.success === true ||
-          response.result === 'ok' ||
-          response.status === 'success')
-        ) ||
-        (typeof response === 'string' && response.toLowerCase().includes('success'))
-      ) {
-        return true;
-      }
-      if (response && typeof response === 'object' && response.error) {
-        return response.error;
-      }
-      return 'Failed to change password.';
-    } catch (error: any) {
-      return error?.message || 'Failed to change password.';
+    
+    if (router.currentRoute.value.path !== '/login') {
+      await router.push('/login')
     }
-  };
+  }
+}
+
+const changePassword = async (oldPassword: string, newPassword: string): Promise<true | string> => {
+  try {
+    if (!session.value) {
+      return 'Session not found.';
+    }
+    const response = await ApiService.post<any>(
+      '/PasswordAuthentication/changePassword', {
+      session: session.value,
+      oldPassword,
+      newPassword,
+    });
+    
+    if (response && response.error) {
+      return response.error;
+    }
+    return true;
+  } catch (error: any) {
+    return error?.message || 'Failed to change password.';
+  }
+};
 
   const deleteUser = async (): Promise<true | string> => {
     try {
