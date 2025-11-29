@@ -4,13 +4,22 @@
       <h1>RunBuddy</h1>
       <ul>
         <li><router-link to="/dashboard">Dashboard</router-link></li>
-        <li><router-link to="/profile">Profile</router-link></li>
+        <li><router-link to="/matches">Matches</router-link></li>
+        <li><router-link to="/messages">Messages</router-link></li>
         <li><router-link to="/goals">Shared Goals</router-link></li>
         <li><router-link to="/milestones">Milestones</router-link></li>
-        <li><router-link to="/messages">Messages</router-link></li>
-        <li><router-link to="/matches">Matches</router-link></li>
       </ul>
-      <button class="topbar-logout" @click="onLogout">Logout</button>
+      <div class="topbar-right">
+        <router-link to="/profile" class="profile-avatar-link">
+          <div v-if="profile.profileImage" class="topbar-profile-preview">
+            <img :src="profile.profileImage" alt="Profile" class="topbar-profile-img" />
+          </div>
+          <div v-else class="topbar-profile-fallback">
+            <span>{{ (auth.user?.username?.charAt(0) || '?').toUpperCase() }}</span>
+          </div>
+        </router-link>
+        <button class="topbar-logout" @click="onLogout">Logout</button>
+      </div>
     </nav>
     <main class="dashboard-main">
       <router-view />
@@ -20,17 +29,22 @@
 
 <script>
 import { useAuthStore } from '../stores/auth';
+import { useProfileStore } from '../stores/profile';
 import { useRouter } from 'vue-router';
+import { storeToRefs } from 'pinia';
 export default {
   name: 'DashboardLayout',
   setup() {
     const auth = useAuthStore();
     const router = useRouter();
+    const profileStore = useProfileStore();
+    const { profile } = storeToRefs(profileStore);
+    
     const onLogout = async () => {
       await auth.logout();
       router.push({ name: 'login' });
     };
-    return { onLogout };
+    return { auth, profile, onLogout };
   },
 }
 </script>
@@ -53,6 +67,45 @@ export default {
   min-height: 56px;
   box-sizing: border-box;
 }
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.profile-avatar-link {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+.topbar-profile-preview {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--color-primary);
+  transition: border-color 0.18s;
+}
+
+.topbar-profile-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.topbar-profile-fallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-accent, orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #fff;
+  border: 2px solid var(--color-primary);
+  transition: border-color 0.18s;
+}
+
 .topbar ul {
   display: flex;
   gap: 1.2rem;
@@ -96,7 +149,6 @@ export default {
   font-size: 1.05rem;
   cursor: pointer;
   transition: background 0.18s;
-  margin-left: 1.5rem;
 }
 .topbar-logout:hover {
   background: #d84315;
