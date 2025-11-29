@@ -1,3 +1,4 @@
+
 <template>
   <div class="goal-detail-container">
     <div v-if="!goal && !loading" class="no-goal-state">
@@ -16,9 +17,14 @@
             <span class="goal-status">{{ goal.isActive ? 'Active' : 'Closed' }}</span>
             <span class="step-count">{{ steps.length }} steps</span>
             Started: {{ formatDate(goal.createdAt) }}
-          </div>
-          <div v-if="!goal.isActive && (goal.completedAt || goal.completed || goal.completed_at)" class="goal-completed-date">
-            Completed at: {{ formatDate(goal.completedAt || goal.completed || goal.completed_at) }}
+            <template v-if="!goal.isActive && goal.closedAt">
+              <span v-if="goalProgress === 100">
+                &nbsp;|&nbsp; <strong>Completed:</strong> {{ formatDate(goal.closedAt) }}
+              </span>
+              <span v-else>
+                &nbsp;|&nbsp; <strong>Closed:</strong> {{ formatDate(goal.closedAt) }}
+              </span>
+            </template>
           </div>
         </div>
       </div>
@@ -58,22 +64,24 @@
             <div class="step-content">
               <h4>{{ step.description }}</h4>
               <div class="step-meta">
-                <span v-if="step.completion && goal.isActive" class="completion-date">Completed: {{ formatDate(step.completion) }}</span>
+                <span v-if="step.completion" class="completion-date">Completed: {{ formatDate(step.completion) }}</span>
               </div>
             </div>
             <div class="step-actions" v-if="goal.isActive">
-              <button v-if="!step.completion && step.id && goal.isActive" @click="completeStep(step.id)" class="complete-button">✓ Complete</button>
+              <button v-if="!step.completion" @click="completeStep(step.id)" class="complete-button">✓ Complete</button>
               <span v-else class="completed-icon">✅</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-if="goalProgress === 100" class="achievement-section">
+
+      <div v-if="goalProgress === 100 && goal.isActive" class="achievement-section">
         <div class="achievement-card">
           <div class="achievement-icon">🏆</div>
           <h3>Congratulations!</h3>
-          <p>You've completed your goal: <strong>{{ goal.description }}</strong></p>
+          <p>You've completed all steps for: <strong>{{ goal.description }}</strong></p>
+          <button class="close-goal" @click="markGoalComplete">Mark Goal Complete</button>
         </div>
       </div>
 
@@ -125,7 +133,6 @@ const goalProgress = computed(() => steps.value.length ? Math.round((completedSt
 
 function formatDate(date) {
   if (!date) return '';
-  // Format: Nov 27, 2025, 3:45 PM (no seconds)
   return format(new Date(date), 'PP p');
 }
 
@@ -137,7 +144,6 @@ function isNextStep(index) {
   }
   return false;
 }
-
 
 async function completeStep(stepId) {
   if (!goal.value || !goal.value.id || !stepId) return;
@@ -151,6 +157,15 @@ async function completeStep(stepId) {
   if (stepIdx !== -1) {
     steps.value[stepIdx].completion = new Date().toISOString();
   }
+}
+
+async function markGoalComplete() {
+  console.log('[markGoalComplete] called');
+  if (!goal.value || !goal.value.id || !auth.user?.id) return;
+  await sharedGoalsStore.closeSharedGoal({ sharedGoal: goal.value.id, user: auth.user.id });
+  // Fetch updated goal data to reflect closed state and completion date
+  const updatedGoal = await sharedGoalsStore.fetchSharedGoalById([auth.user.id, "019ac21f-956d-7768-b714-34751200b213"], goal.value.id);
+  if (updatedGoal) goal.value = updatedGoal;
 }
 
 

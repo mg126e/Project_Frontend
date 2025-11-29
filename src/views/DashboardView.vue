@@ -1,5 +1,8 @@
 <template>
-  <div class="dashboard-home">
+  <div v-if="profileStore.loading || !displayName" class="dashboard-spinner">
+    <span class="spinner"></span>
+  </div>
+  <div v-else class="dashboard-home">
     <h1>Welcome{{ displayName ? `, ${displayName}` : '' }}!</h1>
     <p class="dashboard-welcome-msg">Check out your important stats!</p>
     <div class="dashboard-stats">
@@ -20,7 +23,6 @@
         <div class="stat-value">{{ stats.messages }}</div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -96,5 +98,25 @@ onMounted(async () => {
   font-size: 1.7rem;
   font-weight: 700;
   color: #222;
+}
+/* Spinner styles */
+.dashboard-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+}
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 6px solid #e3e8f0;
+  border-top: 6px solid var(--color-primary, #106cb8);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>

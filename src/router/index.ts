@@ -1,6 +1,7 @@
 
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth'
+import { watch } from 'vue';
 
 const router = createRouter({
 	history: createWebHistory(import.meta.env.BASE_URL),
@@ -103,10 +104,19 @@ const router = createRouter({
 	],
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
 	// Only run on client
 	if (typeof window !== 'undefined') {
 		const auth = useAuthStore();
+		// Wait for auth.ready if not ready yet
+		if (!auth.ready) {
+			await new Promise<void>(resolve => {
+				const stop = watch(
+					() => auth.ready,
+					(val) => { if (val) { stop(); resolve(); } }
+				);
+			});
+		}
 		if (to.matched.some(record => record.meta.requiresAuth)) {
 			if (!auth.user) {
 				return next({ name: 'login', query: { redirect: to.fullPath } });

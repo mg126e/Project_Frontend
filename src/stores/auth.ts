@@ -11,13 +11,21 @@ interface User {
 }
 
 export const useAuthStore = defineStore('auth', () => {
-    const router = useRouter()
+  const router = useRouter()
   // State
-  const user = ref<User | null>(getFromStorage('user', null))
-  const session = ref<string | null>(getFromStorage('session', null))
+  const user = ref<User | null>(null)
+  const session = ref<string | null>(null)
+  const ready = ref(false)
 
   // Computed
   const isAuthenticated = computed(() => !!session.value && !!user.value)
+
+  // Initialize auth state from storage (async for future extensibility)
+  async function init() {
+    user.value = getFromStorage('user', null)
+    session.value = getFromStorage('session', null)
+    ready.value = true
+  }
 
   // Actions
   const login = async (username: string, password: string): Promise<boolean> => {
@@ -72,7 +80,6 @@ export const useAuthStore = defineStore('auth', () => {
       session.value = sessionToken
       setToStorage('user', userData)
       setToStorage('session', sessionToken)
-
 
       // Fetch user profile after registration (auto-creates if missing)
       try {
@@ -140,6 +147,7 @@ export const useAuthStore = defineStore('auth', () => {
     // State
     user,
     session,
+    ready,
 
     // Computed
     isAuthenticated,
@@ -149,5 +157,6 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     logout,
     changePassword,
+    init
   }
 })
