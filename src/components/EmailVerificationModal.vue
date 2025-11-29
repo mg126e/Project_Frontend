@@ -113,7 +113,7 @@ async function verifyCode() {
 
   try {
     verifying.value = true
-    await ApiService.callConceptAction('EmailVerification', 'verifyCode', {
+    await ApiService.callConceptAction('EmailVerification', 'verifyEmail', {
       verificationRecordId: verificationRecordId.value,
       verificationCode: trimmedCode,
     })
