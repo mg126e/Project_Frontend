@@ -14,6 +14,7 @@
       <p v-if="error" class="error-msg">{{ error }}</p>
     </form>
     <p class="switch-link">Don't have an account? <router-link to="/register">Register</router-link></p>
+    <p class="switch-link"><router-link to="/">Back to Home</router-link></p>
   </section>
 </template>
 
@@ -49,7 +50,6 @@ async function onLogin() {
   background: #fff;
   border-radius: 16px;
   padding: 2rem 2.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 .auth-form h1 {
   font-family: 'Monoton', cursive;
@@ -106,6 +106,14 @@ async function onLogin() {
 }
 .switch-link a {
   color: var(--color-primary);
-  text-decoration: underline;
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 0.1em 0.4em;
+  transition: color 0.2s, background 0.2s;
+}
+.switch-link a:hover {
+  color: #106cb8;
+  background: #e3f1fc;
+  text-decoration: none;
 }
 </style>

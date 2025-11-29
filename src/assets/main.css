@@ -8,32 +8,6 @@
   --color-accent: #fb6a2b;
 }
 
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
-  font-family: 'Open Sans', Arial, sans-serif;
-  background: #fff;
-  border-radius: 12px;
-}
-
-header {
-  background: var(--color-primary);
-  color: #fff;
-  padding: 1.2em 2em;
-  border-radius: 0 0 12px 12px;
-  margin-bottom: 2em;
-}
-
-footer {
-  background: var(--color-secondary);
-  color: #fff;
-  padding: 1em 2em;
-  border-radius: 12px 12px 0 0;
-  margin-top: 2em;
-}
-
 body {
   font-family: 'Open Sans', Arial, sans-serif;
 }
@@ -45,6 +19,7 @@ h2, h3, h4, h5, h6 {
 h1 {
   font-family: 'Monoton', cursive;
   letter-spacing: 2px;
+  color: var(--color-secondary);
 }
 
 a {

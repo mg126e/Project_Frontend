@@ -1,6 +1,7 @@
 
 import { createRouter, createWebHistory } from 'vue-router';
-import { useAuthStore } from '../stores/auth' // TODO: include here
+import { useAuthStore } from '../stores/auth'
+import { watch } from 'vue';
 
 const router = createRouter({
 	history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,10 +30,15 @@ const router = createRouter({
 			meta: { requiresGuest: true },
 		},
 		{
-			path: '/dashboard',
-			component: () => import('../views/DashboardLayout.vue'),
-			meta: { requiresAuth: false }, // TODO: set to true
+			path: '/',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
 			children: [
+				{
+					path: 'dashboard',
+					name: 'dashboard-home',
+					component: () => import('../views/DashboardView.vue'),
+				},
 				{
 					path: 'profile',
 					name: 'profile',
@@ -69,7 +75,7 @@ const router = createRouter({
 					component: () => import('../views/SharedGoalsView.vue'),
 				},
 				{
-					path: 'goal/:id',
+					path: 'goals/:id',
 					name: 'goal-detail',
 					component: () => import('../views/GoalDetailView.vue'),
 				},
@@ -96,6 +102,33 @@ const router = createRouter({
 			component: () => import('../views/NotFoundView.vue'),
 		},
 	],
+});
+
+router.beforeEach(async (to, from, next) => {
+	// Only run on client
+	if (typeof window !== 'undefined') {
+		const auth = useAuthStore();
+		// Wait for auth.ready if not ready yet
+		if (!auth.ready) {
+			await new Promise<void>(resolve => {
+				const stop = watch(
+					() => auth.ready,
+					(val) => { if (val) { stop(); resolve(); } }
+				);
+			});
+		}
+		if (to.matched.some(record => record.meta.requiresAuth)) {
+			if (!auth.user) {
+				return next({ name: 'login', query: { redirect: to.fullPath } });
+			}
+		}
+		if (to.matched.some(record => record.meta.requiresGuest)) {
+			if (auth.user) {
+				return next({ path: '/dashboard' });
+			}
+		}
+	}
+	next();
 });
 
 export default router;

@@ -8,16 +8,19 @@
       </div>
       <div class="form-group">
         <label for="register-email">Email</label>
-        <input id="register-email" v-model="email" type="email" required />
+        <input id="register-email" v-model="email" type="email" required @input="onEmailInput" />
+        <span v-if="email && email.length > 0 && !isEduEmail(email)" class="error-msg">Email must end with .edu</span>
       </div>
       <div class="form-group">
         <label for="register-password">Password</label>
-        <input id="register-password" v-model="password" type="password" required />
+        <input id="register-password" v-model="password" type="password" required minlength="8" @input="onPasswordInput" />
+        <span v-if="password && password.length > 0 && password.length < 8" class="error-msg">Password must be at least 8 characters.</span>
       </div>
-      <button class="btn-primary" type="submit" :disabled="loading">Register</button>
+      <button class="btn-primary" type="submit" :disabled="loading || password.length < 8 || !isEduEmail(email)">Register</button>
       <p v-if="error" class="error-msg">{{ error }}</p>
     </form>
     <p class="switch-link">Already have an account? <router-link to="/login">Login</router-link></p>
+    <p class="switch-link"><router-link to="/">Back to Home</router-link></p>
     <EmailVerificationModal
       v-if="showVerifyModal"
       @close="showVerifyModal = false"
@@ -31,7 +34,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { useProfileStore } from '../stores/profile'
 import EmailVerificationModal from '../components/EmailVerificationModal.vue'
 
 
@@ -44,8 +46,21 @@ const showVerifyModal = ref(false)
 const auth = useAuthStore()
 const router = useRouter()
 
+
+function isEduEmail(val) {
+  return typeof val === 'string' && val.trim().toLowerCase().endsWith('.edu');
+}
+
 async function onRegister() {
   error.value = ''
+  if (password.value.length < 8) {
+    error.value = 'Password must be at least 8 characters.';
+    return;
+  }
+  if (!isEduEmail(email.value)) {
+    error.value = 'Email must end with .edu';
+    return;
+  }
   loading.value = true
   try {
     await auth.register(username.value, password.value, email.value)
@@ -70,7 +85,6 @@ function handleVerified() {
   background: #fff;
   border-radius: 16px;
   padding: 2rem 2.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 .auth-form h1 {
   font-family: 'Monoton', cursive;
@@ -127,6 +141,14 @@ function handleVerified() {
 }
 .switch-link a {
   color: var(--color-primary);
-  text-decoration: underline;
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 0.1em 0.4em;
+  transition: color 0.2s, background 0.2s;
+}
+.switch-link a:hover {
+  color: #106cb8;
+  background: #e3f1fc;
+  text-decoration: none;
 }
 </style>

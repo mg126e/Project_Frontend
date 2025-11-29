@@ -11,116 +11,147 @@ interface User {
 }
 
 export const useAuthStore = defineStore('auth', () => {
-    const router = useRouter()
+  const router = useRouter()
   // State
-  const user = ref<User | null>(getFromStorage('user', null))
-  const session = ref<string | null>(getFromStorage('session', null))
+  const user = ref<User | null>(null)
+  const session = ref<string | null>(null)
+  const ready = ref(false)
 
   // Computed
   const isAuthenticated = computed(() => !!session.value && !!user.value)
 
+  // Initialize auth state from storage (async for future extensibility)
+  async function init() {
+    user.value = getFromStorage('user', null)
+    session.value = getFromStorage('session', null)
+    ready.value = true
+  }
+
   // Actions
-  const login = async (username: string, password: string): Promise<boolean> => {
-    try {
-      const response = await ApiService.callConceptAction<
-        { user: string; session: string } | { error: string }
-      >('PasswordAuthentication', 'authenticate', { username, password })
+const login = async (username: string, password: string): Promise<boolean> => {
+  try {
+    const response = await ApiService.post<
+      { user: string; session: string } | { error: string }
+    >('/PasswordAuthentication/authenticate', { username, password })
 
-      if ('error' in response) {
-        return false
-      }
-
-      const { user: userId, session: sessionToken } = response
-      const userData = {
-        id: userId,
-        username: username,
-      }
-
-      user.value = userData
-      session.value = sessionToken
-      setToStorage('user', userData)
-      setToStorage('session', sessionToken)
-
-      return true
-    } catch (error) {
+    if ('error' in response) {
       return false
     }
-  }
 
-  const register = async (username: string, password: string, email?: string): Promise<boolean> => {
+    const { user: userId, session: sessionToken } = response
+    const userData = {
+      id: userId,
+      username: username,
+    }
+
+    user.value = userData
+    session.value = sessionToken
+    setToStorage('user', userData)
+    setToStorage('session', sessionToken)
+
+    return true
+  } catch (error) {
+    return false
+  }
+}
+
+const register = async (username: string, password: string, email?: string): Promise<boolean> => {
+  try {
+    const response = await ApiService.post<
+      { user: string; session: string } | { error: string }
+    >('/PasswordAuthentication/register', {
+      username,
+      password,
+      ...(email ? { email } : {}),
+    })
+
+    if ('error' in response) {
+      throw new Error(response.error || 'Registration failed')
+    }
+
+    const { user: userId, session: sessionToken } = response
+    const userData = {
+      id: userId,
+      username: username,
+      ...(email ? { email } : {}),
+    }
+
+    user.value = userData
+    session.value = sessionToken
+    setToStorage('user', userData)
+    setToStorage('session', sessionToken)
+
+    // Profile is auto-created by backend sync, just fetch it
     try {
-      const response = await ApiService.callConceptAction<
-        { user: string; session: string } | { error: string }
-      >('PasswordAuthentication', 'register', {
-        username,
-        password,
-        ...(email ? { email } : {}),
-      })
-
-      if ('error' in response) {
-        throw new Error(response.error || 'Registration failed')
-      }
-
-      const { user: userId, session: sessionToken } = response
-      const userData = {
-        id: userId,
-        username: username,
-        ...(email ? { email } : {}),
-      }
-
-      user.value = userData
-      session.value = sessionToken
-      setToStorage('user', userData)
-      setToStorage('session', sessionToken)
-
-      return true
-    } catch (error) {
-      throw error
+      const { useProfileStore } = await import('@/stores/profile');
+      const profileStore = useProfileStore();
+      await profileStore.fetchProfile();
+    } catch (e) {
+      console.error('Failed to fetch profile after registration:', e);
     }
+
+    return true
+  } catch (error) {
+    throw error
   }
+}
 
-  const logout = async () => {
-    // Redirect to login page first
-    if (router.currentRoute.value.path !== '/login') {
-      await router.push('/login')
+const logout = async () => {
+  try {
+    if (session.value) {
+      await ApiService.post('/logout', { session: session.value })
     }
-    // Now clear user/session after navigation
+  } catch (e) {
+    console.error('Logout error:', e)
+  } finally {
     user.value = null
     session.value = null
     removeFromStorage('user')
     removeFromStorage('session')
+    
+    if (router.currentRoute.value.path !== '/login') {
+      await router.push('/login')
+    }
   }
+}
 
-  const changePassword = async (oldPassword: string, newPassword: string): Promise<true | string> => {
+const changePassword = async (oldPassword: string, newPassword: string): Promise<true | string> => {
+  try {
+    if (!session.value) {
+      return 'Session not found.';
+    }
+    const response = await ApiService.post<any>(
+      '/PasswordAuthentication/changePassword', {
+      session: session.value,
+      oldPassword,
+      newPassword,
+    });
+    
+    if (response && response.error) {
+      return response.error;
+    }
+    return true;
+  } catch (error: any) {
+    return error?.message || 'Failed to change password.';
+  }
+};
+
+  const deleteUser = async (): Promise<true | string> => {
     try {
       if (!user.value?.id) {
         return 'User not found.';
       }
-      const response = await ApiService.callConceptAction<any>(
-        'PasswordAuthentication', 'changePassword', {
-        user: user.value.id,
-        oldPassword,
-        newPassword,
-      });
-      // Accept various success shapes, or empty/undefined response
-      if (
-        response === undefined || response === null ||
-        (typeof response === 'object' && (
-          Object.keys(response).length === 0 ||
-          response.success === true ||
-          response.result === 'ok' ||
-          response.status === 'success')
-        ) ||
-        (typeof response === 'string' && response.toLowerCase().includes('success'))
-      ) {
-        return true;
-      }
-      if (response && typeof response === 'object' && response.error) {
-        return response.error;
-      }
-      return 'Failed to change password.';
+      // Call closeProfile which triggers backend sync to delete user from PasswordAuthentication
+      const { useProfileStore } = await import('@/stores/profile');
+      const profileStore = useProfileStore();
+      await profileStore.closeProfile();
+      
+      // After closing profile, the backend will delete the user
+      // So we need to log out
+      await logout();
+      return true;
     } catch (error: any) {
-      return error?.message || 'Failed to change password.';
+      return error?.message || 'Failed to delete account.';
     }
   };
 
@@ -128,6 +159,7 @@ export const useAuthStore = defineStore('auth', () => {
     // State
     user,
     session,
+    ready,
 
     // Computed
     isAuthenticated,
@@ -137,5 +169,7 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     logout,
     changePassword,
+    deleteUser,
+    init
   }
 })
