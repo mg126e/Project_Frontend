@@ -345,7 +345,7 @@ async function onImageChange(e) {
   const res = await fetch(`${FILE_API_BASE}/api/files/request-upload-url`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ owner: auth.user._id, filename: file.name })
+    body: JSON.stringify({ owner: auth.user.id, filename: file.name })
   });
   const { file: fileId, uploadURL, error } = await res.json();
   if (error) {

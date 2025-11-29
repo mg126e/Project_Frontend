@@ -36,7 +36,7 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       this.error = '';
       try {
         // Call the new backend method (update backend to support this!)
-        const response = await ApiService.callConceptAction<any>('SharedGoals', 'getAllGoalsForUser', { user });
+        const response = await ApiService.callConceptAction<any>('SharedGoals', '_getAllGoalsForUser', { user });
         this.sharedGoals = Array.isArray(response)
           ? response.map((g: any) => ({
               id: g._id, // use _id from backend

@@ -48,7 +48,7 @@ export const useProfileStore = defineStore('profile', () => {
     try {
       const userId = getUserId();
       if (!userId) throw new Error('User not found');
-      const result = await ApiService.callConceptAction('UserProfile', 'getProfile', { user: userId });
+      const result = await ApiService.callConceptAction('UserProfile', '_getProfile', { user: userId });
       console.log('result:', result);
       if (result && !result.error) {
         const merged = await mergeProfile(result as UserProfile);
@@ -287,11 +287,35 @@ export const useProfileStore = defineStore('profile', () => {
       const result = await ApiService.callConceptAction('UserProfile', 'setIsActive', payload);
       if (result && result.error) {
         error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update isActive.';
+        throw new Error(error.value);
       } else {
         profile.value.isActive = isActive;
+        // Note: When isActive is set to false, the backend DeleteUserOnProfileClose sync
+        // will automatically delete the user from PasswordAuthentication
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update isActive.';
+      throw e;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function closeProfile(): Promise<void> {
+    loading.value = true;
+    error.value = '';
+    try {
+      const userId = getUserId();
+      if (!userId) throw new Error('User not found');
+      const result = await ApiService.callConceptAction('UserProfile', 'closeProfile', { user: userId });
+      if (result && result.error) {
+        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to close profile.';
+        throw new Error(error.value);
+      }
+      // Note: The backend DeleteUserOnAccountClose sync will automatically
+      // delete the user from PasswordAuthentication after closeProfile succeeds
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to close profile.';
       throw e;
     } finally {
       loading.value = false;
@@ -363,6 +387,7 @@ export const useProfileStore = defineStore('profile', () => {
     updateEmergencyContact,
     updateTag,
     batchUpdateProfile,
-    setIsActive
+    setIsActive,
+    closeProfile
   };
 });

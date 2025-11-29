@@ -143,6 +143,25 @@ export const useAuthStore = defineStore('auth', () => {
     }
   };
 
+  const deleteUser = async (): Promise<true | string> => {
+    try {
+      if (!user.value?.id) {
+        return 'User not found.';
+      }
+      // Call closeProfile which triggers backend sync to delete user from PasswordAuthentication
+      const { useProfileStore } = await import('@/stores/profile');
+      const profileStore = useProfileStore();
+      await profileStore.closeProfile();
+      
+      // After closing profile, the backend will delete the user
+      // So we need to log out
+      await logout();
+      return true;
+    } catch (error: any) {
+      return error?.message || 'Failed to delete account.';
+    }
+  };
+
   return {
     // State
     user,
@@ -157,6 +176,7 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     logout,
     changePassword,
+    deleteUser,
     init
   }
 })
