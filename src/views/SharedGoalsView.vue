@@ -9,12 +9,33 @@
     <div v-else-if="error" class="error-msg">{{ error }}</div>
     <div v-else>
       <div class="goal-filters">
-        <label for="goal-filter" class="filter-label">Show:</label>
-        <select id="goal-filter" v-model="filter" class="filter-dropdown">
-          <option value="all">All</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+        <div class="filter-group">
+          <label for="status-filter" class="filter-label">Status:</label>
+          <select id="status-filter" v-model="statusFilter" class="filter-dropdown">
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="user-filter" class="filter-label">Partner:</label>
+          <select id="user-filter" v-model="userFilter" class="filter-dropdown">
+            <option value="all">All</option>
+            <option v-for="user in allUsers" :key="user.id" :value="user.id">
+              {{ user.displayname }}
+            </option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="sort-filter" class="filter-label">Sort by:</label>
+          <select id="sort-filter" v-model="sortBy" class="filter-dropdown">
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="most-steps">Most Steps</option>
+            <option value="least-steps">Least Steps</option>
+            <option value="recently-closed">Recently Closed</option>
+          </select>
+        </div>
       </div>
       <div v-for="user in userGroupsForCollapsible" :key="user.id" class="user-collapsible">
         <div class="user-header" @click="toggleUser(user.id)">
@@ -78,7 +99,9 @@ function getStepCount(goal) {
 const sharedGoalsStore = useSharedGoalsStore();
 const { sharedGoals, loading, error } = storeToRefs(sharedGoalsStore);
 const auth = useAuthStore();
-const filter = ref('all'); // 'all' | 'active' | 'inactive'
+const statusFilter = ref('all'); // 'all' | 'active' | 'inactive'
+const userFilter = ref('all'); // 'all' | specific user ID
+const sortBy = ref('newest'); // 'newest' | 'oldest' | 'most-steps' | 'least-steps' | 'recently-closed'
 const showGoalModal = ref(false);
 const savingGoal = ref(false);
 
@@ -90,10 +113,42 @@ watch(() => showGoalModal.value, (newVal, oldVal) => {
   }
 });
 
+// Get all unique users from all goals
+const allUsers = computed(() => {
+  const userMap = {};
+  sharedGoals.value.forEach(goal => {
+    (goal.users || []).forEach(u => {
+      const id = typeof u === 'object' ? u.id : u;
+      const displayname = typeof u === 'object' ? u.displayname : u;
+      if (id && id !== auth.user.id && !userMap[id]) {
+        userMap[id] = { id, displayname };
+      }
+    });
+  });
+  return Object.values(userMap).sort((a, b) => a.displayname.localeCompare(b.displayname));
+});
+
 const filteredGoals = computed(() => {
-  if (filter.value === 'active') return sharedGoals.value.filter(g => g.isActive);
-  if (filter.value === 'inactive') return sharedGoals.value.filter(g => !g.isActive);
-  return sharedGoals.value;
+  let filtered = sharedGoals.value;
+  
+  // Filter by status
+  if (statusFilter.value === 'active') {
+    filtered = filtered.filter(g => g.isActive);
+  } else if (statusFilter.value === 'inactive') {
+    filtered = filtered.filter(g => !g.isActive);
+  }
+  
+  // Filter by user
+  if (userFilter.value !== 'all') {
+    filtered = filtered.filter(g => 
+      (g.users || []).some(u => {
+        const id = typeof u === 'object' ? u.id : u;
+        return id === userFilter.value;
+      })
+    );
+  }
+  
+  return filtered;
 });
 
 // Group shared goals by each individual user (other than self)
@@ -117,6 +172,36 @@ const userGroupsForCollapsible = computed(() => {
       }
     });
   });
+  
+  // Sort goals within each user group based on sortBy
+  Object.values(userMap).forEach(user => {
+    user.goals.sort((a, b) => {
+      switch (sortBy.value) {
+        case 'newest':
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        case 'oldest':
+          return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+        case 'most-steps':
+          return getStepCount(b) - getStepCount(a);
+        case 'least-steps':
+          return getStepCount(a) - getStepCount(b);
+        case 'recently-closed':
+          // Closed goals first, sorted by closedAt desc, then active goals by createdAt desc
+          if (!a.isActive && !b.isActive) {
+            return new Date(b.closedAt || 0).getTime() - new Date(a.closedAt || 0).getTime();
+          } else if (!a.isActive) {
+            return -1;
+          } else if (!b.isActive) {
+            return 1;
+          } else {
+            return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+          }
+        default:
+          return 0;
+      }
+    });
+  });
+  
   // Sort by name for consistent order
   return Object.values(userMap).sort((a, b) => a.displayname.localeCompare(b.displayname));
 });
@@ -234,12 +319,19 @@ async function onGoalCreated(goalId) {
   align-items: center;
   justify-content: flex-end;
   margin-bottom: 1.5rem;
-  gap: 0.7rem;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 .filter-label {
   font-weight: 600;
   color: var(--color-primary);
   font-size: 1rem;
+  white-space: nowrap;
 }
 .filter-dropdown {
   background: #f7fafd;
@@ -252,6 +344,7 @@ async function onGoalCreated(goalId) {
   cursor: pointer;
   transition: border 0.18s;
   outline: none;
+  min-width: 140px;
 }
 .filter-dropdown:focus {
   border-color: #106cb8;

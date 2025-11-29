@@ -75,7 +75,6 @@
         </div>
       </div>
 
-
       <div v-if="goalProgress === 100 && goal.isActive" class="achievement-section">
         <div class="achievement-card">
           <div class="achievement-icon">🏆</div>

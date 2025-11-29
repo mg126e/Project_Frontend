@@ -30,9 +30,11 @@
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useProfileStore } from '../stores/profile';
+import { useSharedGoalsStore } from '../stores/sharedGoals';
 
 const auth = useAuthStore();
 const profileStore = useProfileStore();
+const sharedGoalsStore = useSharedGoalsStore();
 
 const displayName = computed(() => {
   const profile = profileStore.profile;
@@ -47,10 +49,11 @@ const stats = ref({
 });
 
 onMounted(async () => {
-// TODO: fetch states
   await profileStore.fetchProfile();
+  await sharedGoalsStore.fetchAllSharedGoalsForUser(auth.user.id);
+  
   const profile = profileStore.profile;
-  stats.value.goals = profile?.goals?.length || 0;
+  stats.value.goals = sharedGoalsStore.sharedGoals.length;
   stats.value.milestones = profile?.milestones?.length || 0;
   stats.value.matches = profile?.matches?.length || 0;
   stats.value.messages = profile?.messages?.length || 0;
