@@ -131,7 +131,7 @@ function handleVerified() {
   background: #106cb8;
 }
 .error-msg {
-  color: #d32f2f;
+  color: var(--color-error);
   margin-top: 0.7rem;
   text-align: center;
 }
@@ -148,7 +148,7 @@ function handleVerified() {
 }
 .switch-link a:hover {
   color: #106cb8;
-  background: #e3f1fc;
+  background: var(--color-primary-light);
   text-decoration: none;
 }
 </style>

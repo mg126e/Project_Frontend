@@ -102,7 +102,7 @@ onMounted(async () => {
   font-weight: 700;
   color: #222;
 }
-/* Spinner styles */
+
 .dashboard-spinner {
   display: flex;
   align-items: center;
@@ -112,8 +112,8 @@ onMounted(async () => {
 .spinner {
   width: 48px;
   height: 48px;
-  border: 6px solid #e3e8f0;
-  border-top: 6px solid var(--color-primary, #106cb8);
+  border: 6px solid var(--color-primary-border);
+  border-top: 6px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   display: inline-block;

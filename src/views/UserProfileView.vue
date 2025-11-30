@@ -376,7 +376,7 @@ async function onImageChange(e) {
     });
     
     if (!uploadRes.ok) {
-      const errorText = await uploadRes.text();
+      await uploadRes.text();
       return;
     }
     
@@ -483,7 +483,7 @@ function onPasswordChanged(msg) {
 
 <style scoped>
 .required-star {
-  color: #d32f2f;
+  color: var(--color-error);
   font-size: 1.1em;
   margin-left: 0.15em;
   vertical-align: middle;
@@ -509,7 +509,7 @@ function onPasswordChanged(msg) {
 .profile-view-grid {
   margin-bottom: 2.2rem;
   border-radius: 16px;
-  background: #e3f1fc;
+  background: var(--color-primary-light);
   padding: 2.2rem 3.5rem 1.5rem 3.5rem;
   display: flex;
   flex-direction: column;
@@ -634,7 +634,7 @@ function onPasswordChanged(msg) {
 .form-group select {
   width: 100%;
   padding: 0.6em 1em;
-  border: 1.2px solid #e3e8f0;
+  border: 1.2px solid var(--color-primary-border);
   border-radius: 7px;
   font-size: 1rem;
   background: #f7fafd;
@@ -751,23 +751,23 @@ function onPasswordChanged(msg) {
   transition: color 0.2s, background 0.2s;
 }
 .btn-link.danger {
-  color: #d32f2f;
+  color: var(--color-error);
 }
 .btn-link:hover {
   color: #106cb8;
-  background: #e3f1fc;
+  background: var(--color-primary-light);
 }
 .btn-link.danger:hover {
   color: #b71c1c;
   background: #fdeaea;
 }
 .error-msg {
-  color: #d32f2f;
+  color: var(--color-error);
   margin-top: 0.7rem;
   text-align: center;
 }
 .success-msg {
-  color: #388e3c;
+  color: var(--color-success);
   margin-top: 0.7rem;
   text-align: center;
 }

@@ -147,7 +147,7 @@ async function verifyCode() {
   border-radius: 16px;
   background: #fff;
   position: relative;
-  border: 1.5px solid #e3e8f0;
+  border: 1.5px solid var(--color-primary-border);
   text-align: center;
 }
 .email-modal h2 {
@@ -207,12 +207,12 @@ async function verifyCode() {
   color: #106cb8;
 }
 .error-msg {
-  color: #d32f2f;
+  color: var(--color-error);
   margin-top: 0.7rem;
   text-align: center;
 }
 .success-msg {
-  color: #388e3c;
+  color: var(--color-success);
   margin-top: 0.7rem;
   text-align: center;
 }

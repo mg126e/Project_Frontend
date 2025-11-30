@@ -97,7 +97,7 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       }
     },
 
-    async closeSharedGoal({ sharedGoal, user }: { sharedGoal: string; user: string }) {
+    async closeSharedGoal({ sharedGoal }: { sharedGoal: string }) {
       this.loading = true;
       this.error = '';
       try {
@@ -137,7 +137,7 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       }
     },
 
-    async generateSharedSteps({ sharedGoal, user }: { sharedGoal: string; user: string }) {
+    async generateSharedSteps({ sharedGoal }: { sharedGoal: string }) {
       // Don't use this.loading to avoid triggering reactivity that unmounts the modal
       try {
         const session = this.getSession();
@@ -157,7 +157,7 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       }
     },
 
-    async regenerateSharedSteps({ sharedGoal, user }: { sharedGoal: string; user: string }) {
+    async regenerateSharedSteps({ sharedGoal }: { sharedGoal: string }) {
       // Don't use this.loading to avoid triggering reactivity that unmounts the modal
       try {
         const session = this.getSession();
@@ -176,7 +176,7 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       }
     },
 
-    async addSharedStep({ sharedGoal, description, user }: { sharedGoal: string; description: string; user: string }) {
+    async addSharedStep({ sharedGoal, description }: { sharedGoal: string; description: string }) {
       this.loading = true;
       this.error = '';
       try {
@@ -194,7 +194,7 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       }
     },
 
-    async completeSharedStep({ step, user, sharedGoal }: { step: string; user: string; sharedGoal: string }) {
+    async completeSharedStep({ step, sharedGoal }: { step: string; sharedGoal: string }) {
       this.loading = true;
       this.error = '';
       try {
@@ -206,7 +206,7 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
         // If all steps are now completed, close the goal
         const allComplete = this.steps.length > 0 && this.steps.every(s => !!s.completion);
         if (allComplete) {
-          await this.closeSharedGoal({ sharedGoal, user });
+          await this.closeSharedGoal({ sharedGoal });
         }
       } catch (err: any) {
         this.error = err.message || 'Failed to complete shared step.';
@@ -216,7 +216,7 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       }
     },
 
-    async removeSharedStep({ step, user, sharedGoal }: { step: string; user: string; sharedGoal: string }) {
+    async removeSharedStep({ step, sharedGoal }: { step: string; sharedGoal: string }) {
       this.loading = true;
       this.error = '';
       try {
@@ -246,11 +246,6 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       } finally {
         this.loading = false;
       }
-    },
-
-    // Wrapper for explicit step fetching (for clarity/future-proofing)
-    async getSharedSteps(sharedGoal: string) {
-      return await this.fetchSharedSteps(sharedGoal);
-    },
-  },
+    }
+  }
 });

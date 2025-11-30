@@ -181,7 +181,7 @@ async function loadGoal() {
   const goalId = route.params.id;
   goal.value = await sharedGoalsStore.fetchSharedGoalById([auth.user.id, "019ac21f-956d-7768-b714-34751200b213"], goalId);
   if (goal.value) {
-    await sharedGoalsStore.getSharedSteps(goalId);
+    await sharedGoalsStore.fetchSharedSteps(goalId);
     steps.value = Array.isArray(sharedGoalsStore.steps) ? sharedGoalsStore.steps : [];
   } else {
     steps.value = [];
@@ -200,7 +200,7 @@ onMounted(loadGoal);
   min-height: 400px;
 }
 .no-goal-content {
-  background: #e3f1fc;
+  background: var(--color-primary-light);
   padding: 3rem 2.5rem;
   text-align: center;
 }
@@ -259,7 +259,7 @@ onMounted(loadGoal);
   font-size: 0.9rem;
 }
 .progress-overview {
-  background: #e3f1fc;
+  background: var(--color-primary-light);
   border-radius: 16px;
   padding: 2rem;
   margin-bottom: 2rem;
@@ -303,7 +303,7 @@ onMounted(loadGoal);
   border-radius: 16px;
   padding: 2rem;
   margin-bottom: 2rem;
-  background: #e3f1fc;
+  background: var(--color-primary-light);
 }
 .steps-header h3 {
   margin: 0;
@@ -327,7 +327,7 @@ onMounted(loadGoal);
 }
 .step-item.completed {
   border-color: var(--color-primary);
-  background: #e3f1fc;
+  background: var(--color-primary-light);
 }
 .step-item.next-step {
   border-color: var(--color-accent);
@@ -375,7 +375,7 @@ onMounted(loadGoal);
   transition: background-color 0.2s;
 }
 .complete-button:hover {
-  background: #d84315;
+  background: var(--color-accent-dark);
 }
 .completed-icon {
   font-size: 1.5rem;
@@ -418,7 +418,7 @@ onMounted(loadGoal);
   transition: background 0.2s, transform 0.2s;
 }
 .close-goal:hover {
-  background: #d84315;
+  background: var(--color-accent-dark);
 }
 .loading-state {
   text-align: center;
@@ -443,7 +443,7 @@ onMounted(loadGoal);
   padding: 0.15em 0.5em;
 }
 .back-link:hover {
-  background: #e3f1fc;
+  background: var(--color-primary-light);
   color: var(--color-primary);
 }
 </style>

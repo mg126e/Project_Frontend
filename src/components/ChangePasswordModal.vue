@@ -66,7 +66,6 @@ async function onSubmit() {
     error.value = 'New password must be different from current password.'
     return
   }
-  // Optionally add more password strength checks here
   const result = await auth.changePassword(form.value.current, form.value.new)
   if (result === true) {
     success.value = 'Password changed successfully!'
@@ -101,7 +100,7 @@ async function onSubmit() {
   border-radius: 16px;
   background: #fff;
   position: relative;
-  border: 1.5px solid #e3e8f0;
+  border: 1.5px solid var(--color-primary-border);
 }
 .change-password-form h2 {
   font-size: 1.18rem;
@@ -131,7 +130,7 @@ async function onSubmit() {
   transition: border 0.2s;
 }
 .form-group input:focus {
-  border: 1.5px solid #106cb8;
+  border: 1.5px solid var(--color-primary-dark);
   outline: none;
 }
 .modal-actions {
@@ -152,7 +151,7 @@ async function onSubmit() {
   transition: background 0.2s;
 }
 .btn-primary:hover {
-  background: #106cb8;
+  background: var(--color-primary-dark);
 }
 .btn-link {
   background: none;
@@ -170,12 +169,12 @@ async function onSubmit() {
   background: #e3f1fc;
 }
 .error-msg {
-  color: #d32f2f;
+  color: var(--color-error);
   margin-top: 0.7rem;
   text-align: center;
 }
 .success-msg {
-  color: #388e3c;
+  color: var(--color-success);
   margin-top: 0.7rem;
   text-align: center;
 }

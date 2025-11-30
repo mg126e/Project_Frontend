@@ -59,7 +59,7 @@ export default {
 .topbar {
   width: 100%;
   background: #fff;
-  border-bottom: 1.5px solid #e3e8f0;
+  border-bottom: 1.5px solid var(--color-primary-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -127,8 +127,8 @@ export default {
   display: block;
 }
 .topbar a:hover {
-  background: #e3f1fc;
-  color: #106cb8;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
 }
 .dashboard-main {
   flex: 1;
@@ -151,7 +151,7 @@ export default {
   transition: background 0.18s;
 }
 .topbar-logout:hover {
-  background: #d84315;
+  background: var(--color-accent-dark);
 }
 </style>
 

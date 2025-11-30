@@ -114,7 +114,7 @@ onMounted(() => {
   flex: 1 1 180px;
   min-width: 180px;
   max-width: 220px;
-  background: #f7fafd;
+  background: var(--color-primary-light);
   border: 1.5px solid var(--color-primary);
   border-radius: 10px;
   padding: 1.2rem 1rem;

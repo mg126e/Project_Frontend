@@ -273,14 +273,13 @@ onMounted(async () => {
   background: #f6fff7;
   border-radius: 8px;
   padding: 0.5rem 1rem;
-  border: 1px solid #e0f2f1;
   box-shadow: none;
 }
 
 .error-message {
-  color: #d32f2f;
+  color: var(--color-error);
   margin-top: 0.25em;
-  background-color: #ffcdd2;
+  background-color: var(--color-error-bg);
   border-radius: 8px;
   padding: 1rem;
   font-weight: 500;
@@ -307,7 +306,7 @@ onMounted(async () => {
 .filter-dropdown {
   background: #f7fafd;
   color: var(--color-primary);
-  border: 1.5px solid #e3e8f0;
+  border: 1.5px solid var(--color-primary-border);
   border-radius: 6px;
   padding: 0.45em 1.2em 0.45em 0.8em;
   font-weight: 600;
@@ -340,7 +339,7 @@ section.shared-goals {
 }
 .goal-item {
   padding: 1rem 0;
-  border-bottom: 1px solid #e3e8f0;
+  border-bottom: 1px solid var(--color-primary-border);
 }
 .goal-content {
   display: flex;
@@ -362,7 +361,7 @@ section.shared-goals {
   display: inline-block;
 }
 .goal-link:hover {
-  background: #e3f1fc;
+  background: var(--color-primary-light);
   text-decoration: none;
 }
 .goal-meta-info {
@@ -406,7 +405,7 @@ section.shared-goals {
   cursor: not-allowed;
 }
 .btn-primary:hover:not(:disabled) {
-  background: #d84315;
+  background: var(--color-accent-dark);
 }
 .loading {
   text-align: center;
@@ -415,13 +414,13 @@ section.shared-goals {
 }
 
 .error-msg {
-  color: #d32f2f;
+  color: var(--color-error);
   margin-top: 0.7rem;
   text-align: center;
 }
 
 .success-msg {
-  color: #388e3c;
+  color: var(--color-success);
   margin-left: 1.2rem;
   font-size: 1rem;
 }
@@ -438,11 +437,8 @@ section.shared-goals {
   font-size: 1.15rem;
   font-weight: 600;
   color: var(--color-primary);
-  background: #e3f1fc;
+  background: var(--color-primary-light);
   transition: background 0.18s;
-}
-.user-header:hover {
-  background: #d0e4f0;
 }
 .user-name {
   flex: 1;
@@ -482,7 +478,7 @@ section.shared-goals {
 .saving-spinner {
   width: 60px;
   height: 60px;
-  border: 5px solid #e3f1fc;
+  border: 5px solid var(--color-primary-light);
   border-top: 5px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;

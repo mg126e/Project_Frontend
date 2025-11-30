@@ -78,7 +78,7 @@ function onConfirm() {
   transition: background 0.2s;
 }
 .close-button:hover {
-  background: #e3f1fc;
+  background: var(--color-primary-light);
 }
 .modal-body {
   color: var(--color-primary);
@@ -103,14 +103,10 @@ function onConfirm() {
   transition: background 0.2s;
 }
 .confirm-button.danger {
-  background: #d32f2f;
+  background: var(--color-error);
   color: #fff;
 }
 .confirm-button.danger:hover {
   background: #c62424;
-  color: #fff;
-}
-.confirm-button:not(.danger):hover {
-  background: #d32f2f;
 }
 </style>

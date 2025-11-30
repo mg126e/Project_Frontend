@@ -4,8 +4,15 @@
 
 :root {
   --color-primary: #2280cc;
+  --color-primary-dark: #106cb8;
   --color-secondary: #2d3e56;
   --color-accent: #fb6a2b;
+  --color-accent-dark: #d84315;
+  --color-success: #388e3c;
+  --color-error: #d32f2f;
+  --color-error-bg: #ffcdd2;
+  --color-primary-border: #e3e8f0;
+  --color-primary-light: #e3f1fc;
 }
 
 body {

@@ -90,7 +90,7 @@
 
 <script setup>
 
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { useSharedGoalsStore } from '../stores/sharedGoals';
 import { useAuthStore } from '../stores/auth';
 import { useRouter } from 'vue-router';
@@ -109,7 +109,6 @@ const sharedGoalsStore = useSharedGoalsStore();
 const auth = useAuthStore();
 const router = useRouter();
 
-
 const step = ref(1);
 const method = ref(null); // 'generate' | 'manual'
 const goalDescription = ref('');
@@ -127,7 +126,7 @@ const userList = ref([]);
 const selectedUserId = ref('');
 
 // Build collaborators list ONCE when modal opens (don't react to store changes during operation)
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted } from 'vue';
 onMounted(() => {
   const userMap = {};
   const currentGoals = sharedGoalsStore.sharedGoals || [];
@@ -308,11 +307,6 @@ async function saveGoal() {
       await sharedGoalsStore.removeSharedStep({ step: stepId, user: auth.user.id, sharedGoal: goalId });
     }
     
-    // Now add/update all steps in the correct order
-    // Backend doesn't support reordering or editing, so we'll:
-    // 1. Delete all existing steps that are still in the list but might be edited/reordered
-    // 2. Re-add them all in the new order
-    
     // Delete all remaining original steps (they'll be re-added in correct order)
     const remainingOriginalIds = originalStepIds.value.filter(id => currentStepIds.includes(id));
     for (const stepId of remainingOriginalIds) {
@@ -395,7 +389,7 @@ async function saveGoal() {
   transition: background 0.2s, color 0.2s;
 }
 .close-button:hover {
-  background: #e3f1fc;
+  background: var(--color-primary-light);
   color: var(--color-primary);
 }
 .modal-body {
@@ -412,7 +406,7 @@ async function saveGoal() {
 .modal-body input {
   width: 100%;
   border-radius: 8px;
-  border: 1.5px solid #e3e8f0;
+  border: 1.5px solid var(--color-primary-border);
   padding: 0.75rem;
   margin-bottom: 0.5rem;
   font-size: 1rem;
@@ -434,7 +428,7 @@ async function saveGoal() {
   color: var(--color-primary);
   margin-bottom: 1rem;
   font-size: 0.95rem;
-  background: #e3f1fc;
+  background: var(--color-primary-light);
   padding: 0.5rem 1rem;
   border-radius: 8px;
 }
@@ -472,7 +466,7 @@ async function saveGoal() {
   transition: background 0.2s;
 }
 .delete-step:hover {
-  background: #d84315;
+  background: var(--color-accent-dark);
 }
 .form-actions {
   margin-top: 1.5rem;
@@ -509,7 +503,7 @@ async function saveGoal() {
 }
 .next-button:hover:not(:disabled),
 .primary-button:hover:not(:disabled) {
-  background: #d84315;
+  background: var(--color-accent-dark);
 }
 .drag-handle {
   color: var(--color-secondary);
@@ -519,7 +513,7 @@ async function saveGoal() {
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #e3f1fc;
+  border: 4px solid var(--color-primary-light);
   border-top: 4px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -555,20 +549,20 @@ async function saveGoal() {
   background: #fff;
 }
 .error-message {
-  color: #d32f2f;
+  color: var(--color-error);
   margin-top: 0.25em;
-  background-color: #ffcdd2;
+  background-color: var(--color-error-bg);
   border-radius: 8px;
   padding: 1rem;
   font-weight: 500;
 }
-/* Remove inline styles and use classes for dropdown and action row */
+
 .user-select {
   margin-bottom: 1rem;
   width: 100%;
   padding: 0.5rem;
   border-radius: 8px;
-  border: 1.5px solid #e3e8f0;
+  border: 1.5px solid var(--color-primary-border);
   font-size: 1rem;
   background: #f7fafd;
   color: var(--color-primary);
