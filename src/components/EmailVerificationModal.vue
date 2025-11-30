@@ -125,11 +125,12 @@ async function verifyCode() {
     return
   }
 
-  if (verificationCodeEcho.value && trimmedCode === verificationCodeEcho.value) {
-    successMessage.value = 'Email verified!'
-    emit('verified')
-    return
-  }
+  // REMOVE THIS SHORTCUT - always verify through backend
+  // if (verificationCodeEcho.value && trimmedCode === verificationCodeEcho.value) {
+  //   successMessage.value = 'Email verified!'
+  //   emit('verified')
+  //   return
+  // }
 
   try {
     verifying.value = true
