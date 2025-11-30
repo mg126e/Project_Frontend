@@ -203,7 +203,7 @@ async function verifyCode() {
   cursor: not-allowed;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  background: var(--color-primary-dark);
 }
 .code-entry {
   margin-top: 1.5rem;
@@ -230,7 +230,7 @@ async function verifyCode() {
   transition: color 0.2s;
 }
 .btn-link:hover {
-  color: var(--color-primary-hover);
+  color: var(--color-primary-dark);
 }
 .error-msg {
   color: var(--color-error);
