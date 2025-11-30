@@ -252,8 +252,6 @@ watch(() => editForm.value.profileImage, async (newFileId) => {
 function startEdit() {
   // Only copy from the already-loaded profile.value
   const p = profile.value || {};
-  // Debug log for profile.value
-  console.log('[startEdit] profile.value:', JSON.parse(JSON.stringify(p)));
   // Merge defaults with profile data for tags and emergencyContact
   const defaultTags = {
     gender: '',
@@ -273,8 +271,6 @@ function startEdit() {
     tags: { ...defaultTags, ...(p.tags || {}) }
   };
   isEditMode.value = true;
-  // Debug log
-  console.log('[startEdit] editForm after copy:', JSON.parse(JSON.stringify(editForm.value)));
 }
 
 function cancelEdit() {
@@ -360,15 +356,10 @@ function onLocationInput(event) {
 async function onImageChange(e) {
   const file = e.target.files[0];
   if (!file) return;
-  
-  console.log('[onImageChange] File selected:', file.name, 'Type:', file.type);
-  console.log('[onImageChange] File object:', { name: file.name, type: file.type, size: file.size });
-  
+
   try {
     // 1. Request upload URL WITHOUT contentType - let backend sign without content-type header
-    console.log('[onImageChange] Requesting upload URL (no contentType to avoid signing issues)');
     const uploadReqResult = await profileStore.requestFileUpload(file.name);
-    console.log('[onImageChange] uploadReqResult:', uploadReqResult);
     
     if ('error' in uploadReqResult) {
       console.error('[onImageChange] Error getting upload URL:', uploadReqResult.error);
@@ -377,68 +368,52 @@ async function onImageChange(e) {
     }
     
     const { file: fileId, uploadURL } = uploadReqResult;
-    console.log('[onImageChange] fileId:', fileId);
-    console.log('[onImageChange] uploadURL:', uploadURL);
-    
-    if (!uploadURL) {
-      console.error('[onImageChange] Upload URL is missing');
-      alert('Upload URL is missing from the response.');
-      return;
-    }
-    
-    // 2. Upload to GCS WITHOUT Content-Type header (must match backend signing)
-    console.log('[onImageChange] Uploading WITHOUT Content-Type header');
-    
+
     const uploadRes = await fetch(uploadURL, {
       method: 'PUT',
       body: file
       // NO HEADERS - backend should not include content-type in signed headers
     });
     
-    console.log('[onImageChange] Upload response status:', uploadRes.status);
-    console.log('[onImageChange] Upload response ok:', uploadRes.ok);
-    
     if (!uploadRes.ok) {
       const errorText = await uploadRes.text();
-      console.error('[onImageChange] Upload error response:', errorText);
-      alert('Failed to upload file to storage: ' + errorText);
       return;
     }
     
     // 3. Confirm upload to mark file as uploaded
-    console.log('[onImageChange] Confirming upload...');
     const confirmResult = await profileStore.confirmFileUpload(fileId);
-    console.log('[onImageChange] confirmResult:', confirmResult);
     
     if ('error' in confirmResult) {
-      console.error('[onImageChange] Error confirming upload:', confirmResult.error);
-      alert('Failed to confirm upload: ' + confirmResult.error);
       return;
     }
     
-    // 4. Set the file ID in the edit form and trigger immediate preview
-    console.log('[onImageChange] Setting profileImage to:', fileId);
+    // 4. Create immediate local preview from file blob
+    const localPreviewURL = URL.createObjectURL(file);
+    profileImageUrls.value[fileId] = localPreviewURL;
     editForm.value.profileImage = fileId;
     
-    // Immediately fetch the download URL for preview
+    // 5. Fetch server download URL in background to replace local preview
     try {
       const downloadResult = await profileStore.getFileDownloadURL(fileId);
-      console.log('[onImageChange] Download result:', downloadResult);
-      if ('downloadURL' in downloadResult) {
-        let downloadURL = downloadResult.downloadURL;
+      
+      // Handle both array and object responses
+      const responseData = Array.isArray(downloadResult) ? downloadResult[0] : downloadResult;
+      
+      if (responseData && 'downloadURL' in responseData) {
+        let downloadURL = responseData.downloadURL;
         // If it's a relative URL, prepend the backend base URL
         if (downloadURL.startsWith('/api/')) {
           const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
           downloadURL = baseURL.replace(/\/api$/, '') + downloadURL;
         }
+        // Replace local preview with server URL
+        URL.revokeObjectURL(localPreviewURL); // Clean up blob URL
         profileImageUrls.value[fileId] = downloadURL + '?t=' + Date.now();
-        console.log('[onImageChange] Preview URL set:', profileImageUrls.value[fileId]);
       }
     } catch (previewErr) {
-      console.warn('[onImageChange] Could not load preview URL, will retry after save:', previewErr);
+      console.warn('[onImageChange] Could not load server URL, keeping local preview:', previewErr);
     }
     
-    console.log('[onImageChange] Upload complete! File ID saved to editForm');
   } catch (err) {
     console.error('[onImageChange] Exception during upload:', err);
     alert('An error occurred while uploading the file: ' + (err instanceof Error ? err.message : String(err)));
@@ -476,7 +451,6 @@ async function saveProfile() {
     tags: { ...tagsWithoutGenderOther, gender: genderValue },
     profileImage: p.profileImage
   };
-  console.log('[saveProfile] Sending payload to batchUpdateProfile:', payload);
   try {
     await profileStore.batchUpdateProfile(payload);
     // Re-fetch profile to update profileImage and all fields

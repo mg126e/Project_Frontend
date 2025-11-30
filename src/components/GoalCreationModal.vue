@@ -129,7 +129,6 @@ const selectedUserId = ref('');
 // Build collaborators list ONCE when modal opens (don't react to store changes during operation)
 import { onMounted, onUnmounted } from 'vue';
 onMounted(() => {
-  console.log('[GoalCreationModal] Component mounted');
   const userMap = {};
   const currentGoals = sharedGoalsStore.sharedGoals || [];
   currentGoals.forEach(goal => {
@@ -145,11 +144,6 @@ onMounted(() => {
   if (userList.value.length > 0) {
     selectedUserId.value = userList.value[0].id;
   }
-});
-
-onUnmounted(() => {
-  console.log('[GoalCreationModal] Component is unmounting!');
-  console.trace('[GoalCreationModal] Unmount stack trace');
 });
 
 function resetModalState() {
@@ -195,7 +189,6 @@ function removeStep(idx) {
   steps.value.splice(idx, 1);
 }
 async function regenerateSteps() {
-  console.log('[GoalCreationModal] regenerateSteps called')
   const goalId = goalIdRef.value;
   if (!goalId) {
     generationError.value = 'Goal ID is missing. Cannot regenerate steps.';
@@ -205,13 +198,10 @@ async function regenerateSteps() {
   generating.value = true;
   steps.value = [];
   try {
-    console.log('[GoalCreationModal] Regenerating steps for goal:', goalId, 'user:', auth.user.id)
     const genResult = await sharedGoalsStore.regenerateSharedSteps({ sharedGoal: goalId, user: auth.user.id });
-    console.log('[GoalCreationModal] Regenerate result:', genResult)
     
     // Check for errors first
     if (genResult && genResult.error) {
-      console.error('[GoalCreationModal] Error in genResult:', genResult.error)
       generationError.value = genResult.error;
       generating.value = false;
       return;
@@ -219,30 +209,23 @@ async function regenerateSteps() {
     
     // Extract steps array from response
     const generatedSteps = genResult?.steps || [];
-    console.log('[GoalCreationModal] Extracted steps:', generatedSteps)
     
     if (generatedSteps.length > 0) {
       steps.value = generatedSteps.map((s) => ({ id: s._id, description: s.description }));
       // Track original step IDs to detect deletions later
       originalStepIds.value = generatedSteps.map((s) => s._id);
-      console.log('[GoalCreationModal] Mapped steps for display:', steps.value)
       generationError.value = ''; // Clear any previous errors
     } else {
-      console.warn('[GoalCreationModal] No steps generated')
       generationError.value = 'No steps were generated. Try regenerating or add steps manually.';
     }
   } catch (e) {
-    console.error('[GoalCreationModal] Error regenerating steps:', e);
-    console.error('[GoalCreationModal] Error stack:', e?.stack)
     generationError.value = 'Failed to regenerate steps.';
   } finally {
     generating.value = false;
-    console.log('[GoalCreationModal] regenerateSteps complete, generating:', generating.value)
   }
 }
 
 async function chooseMethod(selected) {
-  console.log('[GoalCreationModal] chooseMethod called with:', selected)
   if (!goalDescription.value.trim()) {
     validationError.value = 'Goal description is required.';
     return;
@@ -254,27 +237,19 @@ async function chooseMethod(selected) {
   steps.value = [];
   if (selected === 'generate') {
     try {
-      console.log('[GoalCreationModal] Starting generation flow...')
       // 1. Create the goal (if not already created)
       const users = [auth.user.id, selectedUserId.value];
       let goalId = goalIdRef.value;
-      console.log('[GoalCreationModal] Current goalId:', goalId)
       if (!goalId) {
-        console.log('[GoalCreationModal] Creating goal with users:', users, 'description:', goalDescription.value)
         const goalResult = await sharedGoalsStore.createSharedGoal({ users, description: goalDescription.value });
-        console.log('[GoalCreationModal] Goal created, result:', goalResult)
         goalId = goalResult?.sharedGoalId || goalResult?.goalId || goalResult?.id || goalResult;
-        console.log('[GoalCreationModal] Extracted goalId:', goalId)
         goalIdRef.value = goalId;
       }
       // 2. Generate steps using backend - returns { steps: [...], error: '...' }
-      console.log('[GoalCreationModal] Generating steps for goal:', goalId, 'user:', auth.user.id)
       const genResult = await sharedGoalsStore.generateSharedSteps({ sharedGoal: goalId, user: auth.user.id });
-      console.log('[GoalCreationModal] Generate result:', genResult)
       
       // Check for errors first
       if (genResult && genResult.error) {
-        console.error('[GoalCreationModal] Error in genResult:', genResult.error)
         generationError.value = genResult.error;
         generating.value = false;
         step.value = 2; // Still go to step 2 so user can see error and regenerate
@@ -283,29 +258,22 @@ async function chooseMethod(selected) {
       
       // 3. Extract steps array from response
       const generatedSteps = genResult?.steps || [];
-      console.log('[GoalCreationModal] Extracted steps:', generatedSteps)
       
       if (generatedSteps.length > 0) {
         steps.value = generatedSteps.map((s) => ({ id: s._id, description: s.description }));
         // Track original step IDs to detect deletions later
         originalStepIds.value = generatedSteps.map((s) => s._id);
-        console.log('[GoalCreationModal] Mapped steps for display:', steps.value)
         generationError.value = ''; // Clear any previous errors
       } else {
         console.warn('[GoalCreationModal] No steps generated')
         generationError.value = 'No steps were generated. Try regenerating or add steps manually.';
       }
-      console.log('[GoalCreationModal] Setting step to 2...')
       step.value = 2;
-      console.log('[GoalCreationModal] Step is now:', step.value)
     } catch (e) {
-      console.error('[GoalCreationModal] Error generating steps:', e);
-      console.error('[GoalCreationModal] Error stack:', e?.stack)
       generationError.value = 'Failed to generate steps.';
       step.value = 2; // Still advance to step 2 so user can add manually
     } finally {
       generating.value = false;
-      console.log('[GoalCreationModal] chooseMethod complete, step:', step.value, 'generating:', generating.value)
     }
   } else if (selected === 'manual') {
     step.value = 2;
@@ -319,8 +287,6 @@ async function saveGoal() {
     generationError.value = 'User ID is missing or invalid. Please log in again.';
     return;
   }
-  
-  console.log('[GoalCreationModal] saveGoal started');
   saving.value = true;
   
   let goalId = goalIdRef.value;
@@ -339,7 +305,6 @@ async function saveGoal() {
     const deletedStepIds = originalStepIds.value.filter(id => !currentStepIds.includes(id));
     
     for (const stepId of deletedStepIds) {
-      console.log('[GoalCreationModal] Deleting removed step:', stepId);
       await sharedGoalsStore.removeSharedStep({ step: stepId, user: auth.user.id, sharedGoal: goalId });
     }
     
@@ -351,26 +316,21 @@ async function saveGoal() {
     // Delete all remaining original steps (they'll be re-added in correct order)
     const remainingOriginalIds = originalStepIds.value.filter(id => currentStepIds.includes(id));
     for (const stepId of remainingOriginalIds) {
-      console.log('[GoalCreationModal] Deleting step for reordering/editing:', stepId);
       await sharedGoalsStore.removeSharedStep({ step: stepId, user: auth.user.id, sharedGoal: goalId });
     }
     
     // Add all steps in the current order (both edited originals and new manual steps)
     for (const stepObj of steps.value) {
-      console.log('[GoalCreationModal] Adding step:', stepObj.description);
       await sharedGoalsStore.addSharedStep({ sharedGoal: goalId, description: stepObj.description, user: auth.user.id });
     }
-    
-    console.log('[GoalCreationModal] Steps saved, goalId:', goalId);
+
   } catch (e) {
-    console.error('[GoalCreationModal] Error saving goal:', e);
     generationError.value = 'Failed to save goal.';
     saving.value = false;
     return;
   }
   
   saving.value = false;
-  console.log('[GoalCreationModal] Save complete, closing and redirecting');
   
   // Close modal immediately
   emit('close');
@@ -461,7 +421,6 @@ async function saveGoal() {
   transition: border-color 0.2s;
 }
 
-/* Ensure goal description textarea uses the correct background */
 #goalDescription {
   background: #f7fafd;
 }

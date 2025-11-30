@@ -34,10 +34,8 @@ const login = async (username: string, password: string): Promise<boolean> => {
       { user: string; session: string } | { error: string }
     >('/PasswordAuthentication/authenticate', { username, password })
 
-    console.log('[auth.login] Backend response:', response)
 
     if ('error' in response) {
-      console.log('[auth.login] Login failed with error:', response.error)
       return false
     }
 
@@ -47,20 +45,13 @@ const login = async (username: string, password: string): Promise<boolean> => {
       username: username,
     }
 
-    console.log('[auth.login] Storing user:', userData)
-    console.log('[auth.login] Storing session:', sessionToken)
-
     user.value = userData
     session.value = sessionToken
     setToStorage('user', userData)
     setToStorage('session', sessionToken)
 
-    console.log('[auth.login] After storage - session.value:', session.value)
-    console.log('[auth.login] localStorage session:', localStorage.getItem('session'))
-
     return true
   } catch (error) {
-    console.error('[auth.login] Login error:', error)
     return false
   }
 }

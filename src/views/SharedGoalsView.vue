@@ -107,7 +107,6 @@ const savingGoal = ref(false);
 
 // Watch for unexpected changes to showGoalModal
 watch(() => showGoalModal.value, (newVal, oldVal) => {
-  console.log('[SharedGoalsView] showGoalModal changed from', oldVal, 'to', newVal);
   if (oldVal === true && newVal === false) {
     console.trace('[SharedGoalsView] Modal closed, stack trace:');
   }
@@ -258,34 +257,6 @@ onMounted(async () => {
   // Fetch steps for all goals after goals are loaded
   await fetchAllSteps();
 });
-
-import { useRouter } from 'vue-router';
-const router = useRouter();
-
-async function onGoalCreated(goalId) {
-  console.log('[SharedGoalsView] onGoalCreated called with goalId:', goalId);
-  console.log('[SharedGoalsView] showGoalModal before:', showGoalModal.value);
-  
-  // Close modal immediately to prevent any re-rendering
-  showGoalModal.value = false;
-  
-  // Wait for next tick to ensure modal is destroyed
-  await nextTick();
-  console.log('[SharedGoalsView] Modal destroyed, starting save flow');
-  
-  savingGoal.value = true;
-  try {
-    await sharedGoalsStore.fetchAllSharedGoalsForUser(auth.user.id);
-    console.log('[SharedGoalsView] Goals fetched, about to redirect');
-    // Redirect to the newly created goal's detail page
-    if (goalId) {
-      router.push(`/goals/${goalId}`);
-    }
-  } finally {
-    savingGoal.value = false;
-    console.log('[SharedGoalsView] savingGoal set to false');
-  }
-}
 </script>
 
 <style scoped>

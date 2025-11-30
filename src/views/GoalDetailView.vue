@@ -159,7 +159,6 @@ async function completeStep(stepId) {
 }
 
 async function markGoalComplete() {
-  console.log('[markGoalComplete] called');
   if (!goal.value || !goal.value.id || !auth.user?.id) return;
   await sharedGoalsStore.closeSharedGoal({ sharedGoal: goal.value.id, user: auth.user.id });
   // Fetch updated goal data to reflect closed state and completion date
