@@ -23,7 +23,6 @@
     <p class="switch-link"><router-link to="/">Back to Home</router-link></p>
     <EmailVerificationModal
       v-if="showVerifyModal"
-      @close="showVerifyModal = false"
       @verified="handleVerified"
     />
   </section>
@@ -63,6 +62,7 @@ async function onRegister() {
   }
   loading.value = true
   try {
+    // Note: register no longer creates a session - that happens after email verification
     await auth.register(username.value, password.value, email.value)
     loading.value = false
     showVerifyModal.value = true
@@ -72,7 +72,32 @@ async function onRegister() {
   }
 }
 
-function handleVerified() {
+async function handleVerified(verificationData) {
+  // After email verification, the backend returns a session
+  if (verificationData?.session && verificationData?.user) {
+    // Store the session and user data
+    const { setToStorage } = await import('../utils')
+    const userData = {
+      id: verificationData.user,
+      username: username.value,
+      email: email.value,
+    }
+    
+    auth.user = userData
+    auth.session = verificationData.session
+    setToStorage('user', userData)
+    setToStorage('session', verificationData.session)
+    
+    // Fetch the profile that was created after verification
+    try {
+      const { useProfileStore } = await import('@/stores/profile')
+      const profileStore = useProfileStore()
+      await profileStore.fetchProfile()
+    } catch (e) {
+      console.error('Failed to fetch profile after verification:', e)
+    }
+  }
+  
   showVerifyModal.value = false
   router.push('/dashboard')
 }

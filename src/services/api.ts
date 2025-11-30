@@ -77,7 +77,12 @@ export class ApiService {
     try {
       const endpoint = actionName ? `/${conceptName}/${actionName}` : `/${conceptName}`
       const response = await apiClient.post(endpoint, data)
-      return response.data
+      // Unwrap { msg: {...} } wrapper from Requesting concept
+      const responseData = response.data
+      if (responseData && typeof responseData === 'object' && 'msg' in responseData) {
+        return responseData.msg as T
+      }
+      return responseData
     } catch (error) {
       throw error
     }

@@ -59,7 +59,7 @@ const login = async (username: string, password: string): Promise<boolean> => {
 const register = async (username: string, password: string, email?: string): Promise<boolean> => {
   try {
     const response = await ApiService.post<
-      { user: string; session: string } | { error: string }
+      { user: string; requiresEmailVerification?: boolean; session?: string } | { error: string }
     >('/PasswordAuthentication/register', {
       username,
       password,
@@ -70,26 +70,19 @@ const register = async (username: string, password: string, email?: string): Pro
       throw new Error(response.error || 'Registration failed')
     }
 
-    const { user: userId, session: sessionToken } = response
+    // After the backend update, registration no longer creates a session automatically
+    // Session and profile are created after email verification
+    // Just store minimal user info for the verification modal
+    const { user: userId, requiresEmailVerification } = response
     const userData = {
       id: userId,
       username: username,
       ...(email ? { email } : {}),
     }
 
+    // Temporarily store user data (no session yet)
     user.value = userData
-    session.value = sessionToken
-    setToStorage('user', userData)
-    setToStorage('session', sessionToken)
-
-    // Profile is auto-created by backend sync, just fetch it
-    try {
-      const { useProfileStore } = await import('@/stores/profile');
-      const profileStore = useProfileStore();
-      await profileStore.fetchProfile();
-    } catch (e) {
-      console.error('Failed to fetch profile after registration:', e);
-    }
+    // Don't set session.value or store in localStorage yet - that happens after verification
 
     return true
   } catch (error) {

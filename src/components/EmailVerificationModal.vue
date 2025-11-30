@@ -1,5 +1,5 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
+  <div class="modal-overlay">
     <div class="modal-content email-modal">
       <h2>Email Verification Required</h2>
       <p class="desc">Please verify your email address to complete registration.</p>
@@ -21,7 +21,6 @@
         </button>
       </div>
 
-      <button class="btn-link" @click="$emit('close')">Close</button>
       <p v-if="error" class="error-msg">{{ error }}</p>
       <p v-if="successMessage" class="success-msg">{{ successMessage }}</p>
     </div>
@@ -29,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { ApiService } from '@/services/api'
 
@@ -43,6 +42,11 @@ const code = ref('')
 const verificationRecordId = ref<string | null>(null)
 const verificationCodeEcho = ref<string | null>(null)
 const auth = useAuthStore()
+
+// Debug: Watch for changes to verificationRecordId
+watch(verificationRecordId, (newVal, oldVal) => {
+  console.debug('[EmailVerification] verificationRecordId changed:', { oldVal, newVal })
+})
 
 function ensureUserContext() {
   if (!auth.user?.id) {
@@ -66,24 +70,40 @@ async function sendVerification() {
     const { userId, email } = ensureUserContext()
     sending.value = true
     const response = await ApiService.callConceptAction<{
-      verificationRecordId: string
+      verificationRecordId?: string
       verificationCode?: string
+      error?: string
     }>('EmailVerification', 'requestVerification', {
       userId,
       email,
     })
 
+    console.debug('[EmailVerification] Response:', response)
+    
+    // Check for error in response
+    if (response.error) {
+      error.value = response.error
+      return
+    }
+    
+    // Check for verificationRecordId
+    if (!response.verificationRecordId) {
+      console.error('[EmailVerification] Missing verificationRecordId. Response:', response)
+      error.value = 'Server error: Missing verification record ID. Please try again or contact support.'
+      return
+    }
+    
     verificationRecordId.value = response.verificationRecordId
     verificationCodeEcho.value = response.verificationCode || null
-    if (response.verificationCode) {
-      console.debug(
-        '[EmailVerification] verification code echo:',
-        response.verificationCode,
-      )
+    
+    if (verificationCodeEcho.value) {
+      console.debug('[EmailVerification] Verification code echo:', verificationCodeEcho.value)
     }
+    
     sent.value = true
     successMessage.value = 'Verification email sent. Enter the code below.'
   } catch (err: any) {
+    console.error('[EmailVerification] Send error:', err)
     error.value = err?.response?.data?.error || err?.message || 'Failed to send verification email.'
   } finally {
     sending.value = false
@@ -94,6 +114,8 @@ async function verifyCode() {
   error.value = ''
   successMessage.value = ''
 
+  console.debug('[EmailVerification] Verifying with recordId:', verificationRecordId.value)
+  
   if (!verificationRecordId.value) {
     error.value = 'Please send a verification email first.'
     return
@@ -113,13 +135,28 @@ async function verifyCode() {
 
   try {
     verifying.value = true
-    await ApiService.callConceptAction('EmailVerification', 'verifyEmail', {
+    const response = await ApiService.callConceptAction<{
+      session?: string
+      user?: string
+      email?: string
+      error?: string
+    }>('EmailVerification', 'verifyEmail', {
       verificationRecordId: verificationRecordId.value,
       verificationCode: trimmedCode,
     })
+    
+    console.debug('[EmailVerification] Verify response:', response)
+    
+    if (response.error) {
+      error.value = response.error
+      return
+    }
+    
     successMessage.value = 'Email verified!'
-    emit('verified')
+    // Emit the session data so RegisterView can store it
+    emit('verified', response)
   } catch (err: any) {
+    console.error('[EmailVerification] Verify error:', err)
     error.value = err?.response?.data?.error || err?.message || 'Invalid verification code.'
   } finally {
     verifying.value = false
