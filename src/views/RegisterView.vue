@@ -23,6 +23,9 @@
     <p class="switch-link"><router-link to="/">Back to Home</router-link></p>
     <EmailVerificationModal
       v-if="showVerifyModal"
+      :username="username"
+      :email="email"
+      :initialVerificationRecordId="verificationRecordId"
       @verified="handleVerified"
     />
   </section>
@@ -35,21 +38,21 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import EmailVerificationModal from '../components/EmailVerificationModal.vue'
 
-
 const username = ref('')
 const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
 const showVerifyModal = ref(false)
+const verificationRecordId = ref(null)
 const auth = useAuthStore()
 const router = useRouter()
-
 
 function isEduEmail(val) {
   return typeof val === 'string' && val.trim().toLowerCase().endsWith('.edu');
 }
 
+// Step 1: Request email verification
 async function onRegister() {
   error.value = ''
   if (password.value.length < 8) {
@@ -62,44 +65,87 @@ async function onRegister() {
   }
   loading.value = true
   try {
-    // Note: register no longer creates a session - that happens after email verification
-    await auth.register(username.value, password.value, email.value)
-    loading.value = false
+    // Do NOT send the verification email yet; just open the modal
+    verificationRecordId.value = null
     showVerifyModal.value = true
+    loading.value = false
   } catch (e) {
     loading.value = false
-    error.value = e?.message || 'Registration failed.'
+    error.value = e?.message || 'Failed to open verification modal.'
   }
 }
 
-async function handleVerified(verificationData) {
-  // After email verification, the backend returns a session
-  if (verificationData?.session && verificationData?.user) {
-    // Store the session and user data
-    const { setToStorage } = await import('../utils')
-    const userData = {
-      id: verificationData.user,
-      username: username.value,
-      email: email.value,
+// Step 2: After code is verified, register the user
+async function handleVerified({ verificationCode }) {
+  // Call the registration endpoint after successful verification
+  loading.value = true
+  try {
+    const regResponse = await authRegisterAfterVerification(username.value, password.value, email.value, verificationRecordId.value, verificationCode)
+    console.log('Registration response:', regResponse)
+    if (regResponse.error) {
+      error.value = regResponse.error
+      loading.value = false
+      return
     }
-    
-    auth.user = userData
-    auth.session = verificationData.session
-    setToStorage('user', userData)
-    setToStorage('session', verificationData.session)
-    
-    // Fetch the profile that was created after verification
-    try {
-      const { useProfileStore } = await import('@/stores/profile')
-      const profileStore = useProfileStore()
-      await profileStore.fetchProfile()
-    } catch (e) {
-      console.error('Failed to fetch profile after verification:', e)
+    // Store the session and user data if returned
+    if (regResponse.session && regResponse.user) {
+      const { setToStorage } = await import('../utils')
+      const userData = {
+        id: regResponse.user,
+        username: username.value,
+        email: email.value,
+      }
+      auth.user = userData
+      auth.session = regResponse.session
+      setToStorage('user', userData)
+      setToStorage('session', regResponse.session)
+      // Fetch the profile that was created after verification
+      try {
+        const { useProfileStore } = await import('@/stores/profile')
+        const profileStore = useProfileStore()
+        await profileStore.fetchProfile()
+      } catch (e) {
+        console.error('Failed to fetch profile after verification:', e)
+      }
+      showVerifyModal.value = false
+      loading.value = false
+      router.push('/dashboard')
+    } else {
+      error.value = 'Registration succeeded but user/session missing. Please log in.'
+      loading.value = false
+      showVerifyModal.value = false
     }
+  } catch (e) {
+    loading.value = false
+    error.value = e?.message || 'Registration failed after verification.'
   }
-  
-  showVerifyModal.value = false
-  router.push('/dashboard')
+}
+
+// Helper: Call email verification endpoint
+async function authRequestVerification(username, email) {
+  try {
+    const { ApiService } = await import('@/services/api')
+    return await ApiService.post('/EmailVerification/requestVerification', { userId: username, email })
+  } catch (e) {
+    return { error: e?.message || 'Failed to request verification.' }
+  }
+}
+
+// Helper: Call registration endpoint after verification
+async function authRegisterAfterVerification(username, password, email, verificationRecordId, verificationCode) {
+  try {
+    const { ApiService } = await import('@/services/api')
+    // This endpoint should check verification and create the user
+    return await ApiService.post('/PasswordAuthentication/register', {
+      username,
+      password,
+      email,
+      verificationRecordId,
+      verificationCode
+    })
+  } catch (e) {
+    return { error: e?.message || 'Failed to register after verification.' }
+  }
 }
 </script>
 

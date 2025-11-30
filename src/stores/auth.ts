@@ -28,31 +28,42 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Actions
-const login = async (username: string, password: string): Promise<boolean> => {
+// login now accepts an optional onUnverified callback
+const login = async (
+  username: string,
+  password: string,
+  onUnverified?: (username: string) => void
+): Promise<boolean> => {
   try {
     const response = await ApiService.post<
       { user: string; session: string } | { error: string }
     >('/PasswordAuthentication/authenticate', { username, password })
 
-
     if ('error' in response) {
-      return false
+      // If email is not verified, trigger the callback for UI to show resend modal
+      if (response.error === 'Please verify your email before logging in.') {
+        if (onUnverified) {
+          onUnverified(username);
+        }
+        return false; // Immediately return, don't continue
+      }
+      return false;
     }
 
-    const { user: userId, session: sessionToken } = response
+    const { user: userId, session: sessionToken } = response;
     const userData = {
       id: userId,
       username: username,
-    }
+    };
 
-    user.value = userData
-    session.value = sessionToken
-    setToStorage('user', userData)
-    setToStorage('session', sessionToken)
+    user.value = userData;
+    session.value = sessionToken;
+    setToStorage('user', userData);
+    setToStorage('session', sessionToken);
 
-    return true
+    return true;
   } catch (error) {
-    return false
+    return false;
   }
 }
 

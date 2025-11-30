@@ -3,8 +3,8 @@
     <div class="modal-content email-modal">
       <h2>Email Verification Required</h2>
       <p class="desc">Please verify your email address to complete registration.</p>
-      <button class="btn-primary" @click="sendVerification" :disabled="sending">
-        {{ sent ? 'Resend Verification Email' : sending ? 'Sending...' : 'Send Verification Email' }}
+      <button class="btn-primary" @click="sendVerification" :disabled="sending || !canResend">
+        {{ sending ? 'Sending...' : sent ? 'Resend Verification Email' : 'Send Verification Email' }}
       </button>
 
       <div v-if="sent" class="code-entry">
@@ -28,9 +28,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+
+
+import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { ApiService } from '@/services/api'
+import { useRouter } from 'vue-router'
+
+const props = defineProps({
+  userId: { type: String, default: '' }, // real userId from backend
+  username: { type: String, default: '' },
+  email: { type: String, default: '' },
+  initialVerificationRecordId: { type: [String, null], default: null }
+})
 
 const emit = defineEmits(['close', 'verified'])
 const sending = ref(false)
@@ -41,7 +51,12 @@ const successMessage = ref('')
 const code = ref('')
 const verificationRecordId = ref<string | null>(null)
 const verificationCodeEcho = ref<string | null>(null)
+const canResend = ref(true)
+
+// When the modal opens, sent is false, so the code entry is hidden until the user clicks the button
+
 const auth = useAuthStore()
+const router = useRouter()
 
 // Debug: Watch for changes to verificationRecordId
 watch(verificationRecordId, (newVal, oldVal) => {
@@ -49,18 +64,16 @@ watch(verificationRecordId, (newVal, oldVal) => {
 })
 
 function ensureUserContext() {
-  if (!auth.user?.id) {
+  // Prefer Pinia user, then props.userId, then props.username
+  const userId = auth.user?.id || props.userId || props.username
+  const email = auth.user?.email || props.email
+  if (!userId) {
     throw new Error('Missing user information. Please log in again.')
   }
-
-  if (!auth.user?.email) {
+  if (!email) {
     throw new Error('We need an email address to verify your account.')
   }
-
-  return {
-    userId: auth.user.id,
-    email: auth.user.email,
-  }
+  return { userId, email }
 }
 
 async function sendVerification() {
@@ -69,6 +82,7 @@ async function sendVerification() {
   try {
     const { userId, email } = ensureUserContext()
     sending.value = true
+    canResend.value = false
     const response = await ApiService.callConceptAction<{
       verificationRecordId?: string
       verificationCode?: string
@@ -83,13 +97,15 @@ async function sendVerification() {
     // Check for error in response
     if (response.error) {
       error.value = response.error
+      canResend.value = true
       return
     }
     
     // Check for verificationRecordId
     if (!response.verificationRecordId) {
       console.error('[EmailVerification] Missing verificationRecordId. Response:', response)
-      error.value = 'Server error: Missing verification record ID. Please try again or contact support.'
+      error.value = 'Server error: Missing verification record ID. Please try again.'
+      canResend.value = true
       return
     }
     
@@ -102,9 +118,12 @@ async function sendVerification() {
     
     sent.value = true
     successMessage.value = 'Verification email sent. Enter the code below.'
+    // Allow resend after 30 seconds
+    setTimeout(() => { canResend.value = true }, 30000)
   } catch (err: any) {
     console.error('[EmailVerification] Send error:', err)
     error.value = err?.response?.data?.error || err?.message || 'Failed to send verification email.'
+    canResend.value = true
   } finally {
     sending.value = false
   }
@@ -125,13 +144,6 @@ async function verifyCode() {
     return
   }
 
-  // REMOVE THIS SHORTCUT - always verify through backend
-  // if (verificationCodeEcho.value && trimmedCode === verificationCodeEcho.value) {
-  //   successMessage.value = 'Email verified!'
-  //   emit('verified')
-  //   return
-  // }
-
   try {
     verifying.value = true
     const response = await ApiService.callConceptAction<{
@@ -147,10 +159,23 @@ async function verifyCode() {
       error.value = response.error
       return
     }
-    
+    // If backend returns session and user, update auth store and persist to localStorage
+    if (response.session && response.user) {
+      auth.session = response.session
+      auth.user = { id: response.user, email: response.email || '', username: props.username || '' }
+      // Persist to localStorage so user stays logged in
+      try {
+        const { setToStorage } = await import('@/utils')
+        setToStorage('user', auth.user)
+        setToStorage('session', response.session)
+      } catch (e) {
+        // ignore storage errors
+      }
+    }
     successMessage.value = 'Email verified!'
-    // Emit the session data so RegisterView can store it
     emit('verified', response)
+    emit('close')
+    router.push('/dashboard')
   } catch (err: any) {
     console.error('[EmailVerification] Verify error:', err)
     error.value = err?.response?.data?.error || err?.message || 'Invalid verification code.'
