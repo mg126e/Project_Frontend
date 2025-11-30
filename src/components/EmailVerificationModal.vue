@@ -125,6 +125,12 @@ async function verifyCode() {
     return
   }
 
+  if (verificationCodeEcho.value && trimmedCode === verificationCodeEcho.value) {
+    successMessage.value = 'Email verified!'
+    emit('verified')
+    return
+  }
+
   try {
     verifying.value = true
     const response = await ApiService.callConceptAction<{
@@ -203,7 +209,7 @@ async function verifyCode() {
   cursor: not-allowed;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-dark);
+  background: #106cb8;
 }
 .code-entry {
   margin-top: 1.5rem;
@@ -218,19 +224,6 @@ async function verifyCode() {
   font-size: 1rem;
   letter-spacing: 2px;
   text-align: center;
-}
-.btn-link {
-  background: none;
-  color: var(--color-primary);
-  border: none;
-  padding: 0.5em 1em;
-  font-size: 1rem;
-  cursor: pointer;
-  text-decoration: underline;
-  transition: color 0.2s;
-}
-.btn-link:hover {
-  color: var(--color-primary-dark);
 }
 .error-msg {
   color: var(--color-error);
