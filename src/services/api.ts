@@ -110,8 +110,12 @@ export class ApiService {
     /**
    * FileUploading concept helpers
    */
-  static async requestUploadURL(owner: string, filename: string): Promise<{ file: string; uploadURL: string } | { error: string }> {
-    return await ApiService.callConceptAction('FileUploading', 'requestUploadURL', { owner, filename });
+  static async requestUploadURL(session: string, filename: string, contentType?: string): Promise<{ file: string; uploadURL: string; contentType?: string } | { error: string }> {
+    const payload: any = { session, filename };
+    if (contentType) {
+      payload.contentType = contentType;
+    }
+    return await ApiService.callConceptAction('FileUploading', 'requestUploadURL', payload);
   }
 
   static async confirmUpload(file: string): Promise<{ file: string } | { error: string }> {
@@ -119,7 +123,7 @@ export class ApiService {
   }
 
   static async getDownloadURL(file: string): Promise<{ downloadURL: string } | { error: string }> {
-    return await ApiService.callConceptAction('FileUploading', 'getDownloadURL', { file });
+    return await ApiService.callConceptAction('FileUploading', '_getDownloadURL', { file });
   }
 }
 

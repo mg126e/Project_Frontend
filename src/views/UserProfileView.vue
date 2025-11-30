@@ -10,8 +10,8 @@
         <input id="displayname" v-model="editForm.displayname" type="text" required />
       </div>
       <div class="profile-avatar-row">
-        <div v-if="editForm.profileImage" class="profile-preview-wrapper">
-          <img :src="getProfileImageUrl(editForm.profileImage)" alt="Profile Preview" class="profile-preview" />
+        <div v-if="editFormImageUrl" class="profile-preview-wrapper">
+          <img :src="editFormImageUrl" alt="Profile Preview" class="profile-preview" />
         </div>
         <div v-else class="profile-fallback-avatar">
           <span>{{ (auth.user?.username?.charAt(0) || '?').toUpperCase() }}</span>
@@ -109,8 +109,8 @@
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Location</span><span class="profile-value">{{ profile.location }}</span></div>
         </div>
         <div class="profile-view-avatar-large">
-          <div v-if="profile.profileImage" class="profile-preview-wrapper">
-            <img :src="getProfileImageUrl(profile.profileImage)" alt="Profile Preview" class="profile-preview-large" />
+          <div v-if="currentProfileImageUrl" class="profile-preview-wrapper">
+            <img :src="currentProfileImageUrl" alt="Profile Preview" class="profile-preview-large" />
           </div>
           <div v-else class="profile-fallback-avatar-large">
             <span>{{ (auth.user?.username?.charAt(0) || '?').toUpperCase() }}</span>
@@ -160,36 +160,29 @@
 </template>
 
 <script setup>
-
+import { ref, onMounted, watch, computed } from 'vue';
+import { useAuthStore } from '../stores/auth';
+import ChangePasswordModal from '../components/ChangePasswordModal.vue';
 import ConfirmActionModal from '../components/ConfirmActionModal.vue';
+import { useProfileStore } from '../stores/profile';
+import { storeToRefs } from 'pinia';
+
+const auth = useAuthStore();
+const profileStore = useProfileStore();
+const { profile } = storeToRefs(profileStore);
 
 const showDeleteModal = ref(false);
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
-const FILE_API_BASE = API_BASE.endsWith('/api') ? API_BASE.slice(0, -4) : API_BASE;
-const downloadUrlCache = {};
-function getProfileImageUrl(fileId) {
-  if (!fileId) return '';
-  if (fileId.startsWith('data:image/')) return fileId; // fallback for legacy base64
-  if (downloadUrlCache[fileId]) return downloadUrlCache[fileId];
-  // Start async fetch, but return empty string for now
-  fetch(`${FILE_API_BASE}/api/files/get-download-url`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ file: fileId })
-  })
-    .then(res => res.json())
-    .then(data => {
-      if (data.downloadURL) {
-        downloadUrlCache[fileId] = data.downloadURL;
-        // Force update by triggering a reactive change
-        if (editForm.value.profileImage === fileId) editForm.value.profileImage = '' + fileId;
-        if (profile.value.profileImage === fileId) profile.value.profileImage = '' + fileId;
-      }
-    });
-  return '';
-}
+const showPasswordModal = ref(false);
+const deleteMsg = ref('');
+const deleteMsgType = ref('');
+const emergencyPhoneError = ref(false);
+const passwordChangeMsg = ref('');
+const loadingProfile = ref(true);
+const locationError = ref(false);
+const paceInputError = ref(false);
+const isEditMode = ref(false);
 
-// Local edit form for editing profile
+// Local edit form for editing profile - MUST be declared before watchers/computed that use it
 const editForm = ref({
   displayname: '',
   profileImage: '',
@@ -205,6 +198,56 @@ const editForm = ref({
     personality: ''
   }
 });
+
+// Profile image URL cache and management
+const profileImageUrls = ref({});
+
+async function getProfileImageUrl(fileId) {
+  if (!fileId) return '';
+  if (fileId.startsWith('data:image/')) return fileId; // fallback for legacy base64
+  if (fileId.startsWith('http://') || fileId.startsWith('https://')) return fileId; // already a URL
+  
+  // Check cache first
+  if (profileImageUrls.value[fileId]) {
+    return profileImageUrls.value[fileId];
+  }
+  
+  // Use the profile store method to get download URL
+  const result = await profileStore.getFileDownloadURL(fileId);
+  if ('downloadURL' in result) {
+    profileImageUrls.value[fileId] = result.downloadURL;
+    return result.downloadURL;
+  }
+  return '';
+}
+
+// Computed properties for reactive image URLs
+const currentProfileImageUrl = computed(() => {
+  const fileId = profile.value.profileImage;
+  if (!fileId) return '';
+  if (fileId.startsWith('http')) return fileId;
+  return profileImageUrls.value[fileId] || '';
+});
+
+const editFormImageUrl = computed(() => {
+  const fileId = editForm.value.profileImage;
+  if (!fileId) return '';
+  if (fileId.startsWith('http')) return fileId;
+  return profileImageUrls.value[fileId] || '';
+});
+
+// Load profile image URLs when they change
+watch(() => profile.value.profileImage, async (newFileId) => {
+  if (newFileId && !newFileId.startsWith('http') && !profileImageUrls.value[newFileId]) {
+    await getProfileImageUrl(newFileId);
+  }
+}, { immediate: true });
+
+watch(() => editForm.value.profileImage, async (newFileId) => {
+  if (newFileId && !newFileId.startsWith('http') && !profileImageUrls.value[newFileId]) {
+    await getProfileImageUrl(newFileId);
+  }
+}, { immediate: true });
 
 function startEdit() {
   // Only copy from the already-loaded profile.value
@@ -257,26 +300,6 @@ function cancelEdit() {
   isEditMode.value = false;
 }
 
-import { ref, onMounted, watch } from 'vue';
-import { useAuthStore } from '../stores/auth';
-import ChangePasswordModal from '../components/ChangePasswordModal.vue';
-import { useProfileStore } from '../stores/profile';
-import { storeToRefs } from 'pinia';
-
-const auth = useAuthStore();
-
-const showPasswordModal = ref(false);
-const deleteMsg = ref('');
-const deleteMsgType = ref('');
-
-const profileStore = useProfileStore();
-const { profile } = storeToRefs(profileStore);
-
-const emergencyPhoneError = ref(false);
-const passwordChangeMsg = ref('');
-
-const loadingProfile = ref(true);
-
 onMounted(async () => {
   await profileStore.fetchProfile();
   if (profile.value.isActive === false) {
@@ -322,10 +345,6 @@ function onEmergencyPhoneInput(event) {
   emergencyPhoneError.value = phone.length > 0 && !validatePhone(phone);
 }
 
-const isEditMode = ref(false);
-const locationError = ref(false);
-const paceInputError = ref(false);
-
 function onPaceInput(event) {
   const pace = event && event.target ? event.target.value : '';
   // Only show error if field is non-empty and invalid
@@ -341,34 +360,89 @@ function onLocationInput(event) {
 async function onImageChange(e) {
   const file = e.target.files[0];
   if (!file) return;
-  // 1. Request upload URL and file ID from backend
-  const res = await fetch(`${FILE_API_BASE}/api/files/request-upload-url`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ owner: auth.user.id, filename: file.name })
-  });
-  const { file: fileId, uploadURL, error } = await res.json();
-  if (error) {
-    alert('Failed to get upload URL: ' + error);
-    return;
+  
+  console.log('[onImageChange] File selected:', file.name, 'Type:', file.type);
+  console.log('[onImageChange] File object:', { name: file.name, type: file.type, size: file.size });
+  
+  try {
+    // 1. Request upload URL WITHOUT contentType - let backend sign without content-type header
+    console.log('[onImageChange] Requesting upload URL (no contentType to avoid signing issues)');
+    const uploadReqResult = await profileStore.requestFileUpload(file.name);
+    console.log('[onImageChange] uploadReqResult:', uploadReqResult);
+    
+    if ('error' in uploadReqResult) {
+      console.error('[onImageChange] Error getting upload URL:', uploadReqResult.error);
+      alert('Failed to get upload URL: ' + uploadReqResult.error);
+      return;
+    }
+    
+    const { file: fileId, uploadURL } = uploadReqResult;
+    console.log('[onImageChange] fileId:', fileId);
+    console.log('[onImageChange] uploadURL:', uploadURL);
+    
+    if (!uploadURL) {
+      console.error('[onImageChange] Upload URL is missing');
+      alert('Upload URL is missing from the response.');
+      return;
+    }
+    
+    // 2. Upload to GCS WITHOUT Content-Type header (must match backend signing)
+    console.log('[onImageChange] Uploading WITHOUT Content-Type header');
+    
+    const uploadRes = await fetch(uploadURL, {
+      method: 'PUT',
+      body: file
+      // NO HEADERS - backend should not include content-type in signed headers
+    });
+    
+    console.log('[onImageChange] Upload response status:', uploadRes.status);
+    console.log('[onImageChange] Upload response ok:', uploadRes.ok);
+    
+    if (!uploadRes.ok) {
+      const errorText = await uploadRes.text();
+      console.error('[onImageChange] Upload error response:', errorText);
+      alert('Failed to upload file to storage: ' + errorText);
+      return;
+    }
+    
+    // 3. Confirm upload to mark file as uploaded
+    console.log('[onImageChange] Confirming upload...');
+    const confirmResult = await profileStore.confirmFileUpload(fileId);
+    console.log('[onImageChange] confirmResult:', confirmResult);
+    
+    if ('error' in confirmResult) {
+      console.error('[onImageChange] Error confirming upload:', confirmResult.error);
+      alert('Failed to confirm upload: ' + confirmResult.error);
+      return;
+    }
+    
+    // 4. Set the file ID in the edit form and trigger immediate preview
+    console.log('[onImageChange] Setting profileImage to:', fileId);
+    editForm.value.profileImage = fileId;
+    
+    // Immediately fetch the download URL for preview
+    try {
+      const downloadResult = await profileStore.getFileDownloadURL(fileId);
+      console.log('[onImageChange] Download result:', downloadResult);
+      if ('downloadURL' in downloadResult) {
+        let downloadURL = downloadResult.downloadURL;
+        // If it's a relative URL, prepend the backend base URL
+        if (downloadURL.startsWith('/api/')) {
+          const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+          downloadURL = baseURL.replace(/\/api$/, '') + downloadURL;
+        }
+        profileImageUrls.value[fileId] = downloadURL + '?t=' + Date.now();
+        console.log('[onImageChange] Preview URL set:', profileImageUrls.value[fileId]);
+      }
+    } catch (previewErr) {
+      console.warn('[onImageChange] Could not load preview URL, will retry after save:', previewErr);
+    }
+    
+    console.log('[onImageChange] Upload complete! File ID saved to editForm');
+  } catch (err) {
+    console.error('[onImageChange] Exception during upload:', err);
+    alert('An error occurred while uploading the file: ' + (err instanceof Error ? err.message : String(err)));
   }
-  // 2. Upload the file to the uploadURL
-  const uploadRes = await fetch(uploadURL, {
-    method: 'PUT',
-    body: file
-  });
-  if (!uploadRes.ok) {
-    alert('Failed to upload file.');
-    return;
-  }
-  // 3. Confirm upload
-  await fetch(`${FILE_API_BASE}/api/files/confirm-upload`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ file: fileId })
-  });
-  // 4. Set the file ID in the edit form
-  editForm.value.profileImage = fileId;
 }
 
 async function saveProfile() {

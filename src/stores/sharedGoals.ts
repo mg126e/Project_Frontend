@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ApiService } from '@/services/api';
+import { useAuthStore } from '@/stores/auth';
 
 export interface SharedGoalUser {
   id: string;
@@ -29,14 +30,20 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
     error: '',
   }),
   actions: {
+    getSession() {
+      const authStore = useAuthStore();
+      return authStore.session;
+    },
 
     // New: Fetch all shared goals for a user
-    async fetchAllSharedGoalsForUser(user: string) {
+    async fetchAllSharedGoalsForUser() {
       this.loading = true;
       this.error = '';
       try {
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
         // Call the new backend method (update backend to support this!)
-        const response = await ApiService.callConceptAction<any>('SharedGoals', '_getAllGoalsForUser', { user });
+        const response = await ApiService.callConceptAction<any>('SharedGoals', '_getAllGoalsForUser', { session });
         this.sharedGoals = Array.isArray(response)
           ? response.map((g: any) => ({
               id: g._id, // use _id from backend
@@ -63,7 +70,9 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       this.loading = true;
       this.error = '';
       try {
-        const response = await ApiService.callConceptAction<any>('SharedGoals', '_getSharedGoalById', { users, sharedGoalId });
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
+        const response = await ApiService.callConceptAction<any>('SharedGoals', '_getSharedGoalById', { session, users, sharedGoalId });
         return response;
       } catch (err: any) {
         this.error = err.message || 'Failed to fetch shared goal.';
@@ -76,8 +85,10 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
     async createSharedGoal({ users, description }: { users: string[]; description: string }) {
       console.log('[Store createSharedGoal] Called with:', { users, description })
       try {
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
         console.log('[Store createSharedGoal] Calling API...')
-        const response = await ApiService.callConceptAction<any>('SharedGoals', 'createSharedGoal', { users, description });
+        const response = await ApiService.callConceptAction<any>('SharedGoals', 'createSharedGoal', { session, users, description });
         console.log('[Store createSharedGoal] API response:', response)
         if (response.error) throw new Error(response.error);
         // Do NOT refresh the goals list here.
@@ -96,7 +107,9 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       this.error = '';
       console.log('[closeSharedGoal] called with:', { sharedGoal, user });
       try {
-        const response = await ApiService.callConceptAction<any>('SharedGoals', 'closeSharedGoal', { sharedGoal, user });
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
+        const response = await ApiService.callConceptAction<any>('SharedGoals', 'closeSharedGoal', { session, sharedGoal });
         console.log('[closeSharedGoal] API response:', response);
         if (response.error) throw new Error(response.error);
       } catch (err: any) {
@@ -112,7 +125,9 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       this.loading = true;
       this.error = '';
       try {
-        const response = await ApiService.callConceptAction<any>('SharedGoals', '_getSharedSteps', { sharedGoal });
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
+        const response = await ApiService.callConceptAction<any>('SharedGoals', '_getSharedSteps', { session, sharedGoal });
           this.steps = Array.isArray(response)
             ? response.map((s: any) => ({
                 id: s.id || s._id,
@@ -134,9 +149,11 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       console.log('[Store generateSharedSteps] Called with:', { sharedGoal, user })
       // Don't use this.loading to avoid triggering reactivity that unmounts the modal
       try {
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
         console.log('[Store generateSharedSteps] Calling API...')
         // Correct backend action name is 'generateSharedSteps'
-        const response = await ApiService.callConceptAction<any>('SharedGoals', 'generateSharedSteps', { sharedGoal, user });
+        const response = await ApiService.callConceptAction<any>('SharedGoals', 'generateSharedSteps', { session, sharedGoal });
         console.log('[Store generateSharedSteps] API response:', response)
         if (response.error) {
           // Return error object instead of throwing to keep modal alive
@@ -158,8 +175,10 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       console.log('[Store regenerateSharedSteps] Called with:', { sharedGoal, user })
       // Don't use this.loading to avoid triggering reactivity that unmounts the modal
       try {
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
         console.log('[Store regenerateSharedSteps] Calling API...')
-        const response = await ApiService.callConceptAction<any>('SharedGoals', 'regenerateSharedSteps', { sharedGoal, user });
+        const response = await ApiService.callConceptAction<any>('SharedGoals', 'regenerateSharedSteps', { session, sharedGoal });
         console.log('[Store regenerateSharedSteps] API response:', response)
         if (response.error) {
           // Return error object instead of throwing to keep modal alive
@@ -181,7 +200,9 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       this.loading = true;
       this.error = '';
       try {
-        const response = await ApiService.callConceptAction<any>('SharedGoals', 'addSharedStep', { sharedGoal, description, user });
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
+        const response = await ApiService.callConceptAction<any>('SharedGoals', 'addSharedStep', { session, sharedGoal, description });
         if (response.error) throw new Error(response.error);
         await this.fetchSharedSteps(sharedGoal);
         return response.step;
@@ -197,7 +218,9 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       this.loading = true;
       this.error = '';
       try {
-        const response = await ApiService.callConceptAction<any>('SharedGoals', 'completeSharedStep', { step, user });
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
+        const response = await ApiService.callConceptAction<any>('SharedGoals', 'completeSharedStep', { session, step });
         if (response.error) throw new Error(response.error);
         await this.fetchSharedSteps(sharedGoal);
         // If all steps are now completed, close the goal
@@ -217,7 +240,9 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       this.loading = true;
       this.error = '';
       try {
-        const response = await ApiService.callConceptAction<any>('SharedGoals', 'removeSharedStep', { step, user });
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
+        const response = await ApiService.callConceptAction<any>('SharedGoals', 'removeSharedStep', { session, step });
         if (response.error) throw new Error(response.error);
         await this.fetchSharedSteps(sharedGoal);
       } catch (err: any) {
@@ -232,7 +257,9 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       this.loading = true;
       this.error = '';
       try {
-        await ApiService.callConceptAction<any>('SharedGoals', 'setInitialized', { users, isInitialized });
+        const session = this.getSession();
+        if (!session) throw new Error('Session not found');
+        await ApiService.callConceptAction<any>('SharedGoals', 'setInitialized', { session, users, isInitialized });
       } catch (err: any) {
         this.error = err.message || 'Failed to set initialized.';
         throw err;

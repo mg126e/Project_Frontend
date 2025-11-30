@@ -22,7 +22,7 @@ interface UserProfile {
 export const useProfileStore = defineStore('profile', () => {
   const authStore = useAuthStore();
   const getUserId = () => authStore.user?.id;
-  const getSession = () => authStore.session; // TODO: use
+  const getSession = () => authStore.session;
   const profile = ref<UserProfile>({
     displayname: '',
     profileImage: '',
@@ -50,22 +50,24 @@ export const useProfileStore = defineStore('profile', () => {
       if (!session) throw new Error('Session not found');
       const result = await ApiService.callConceptAction('UserProfile', '_getProfile', { session });
       console.log('result:', result);
-      if (result && !result.error) {
-        const merged = await mergeProfile(result as UserProfile);
+      
+      // Backend returns { profile: {...} } not just the profile object
+      if (result && result.profile && !result.profile.error) {
+        const merged = await mergeProfile(result.profile as UserProfile);
         // Only mutate properties, never replace the object
         for (const key of Object.keys(merged)) {
           // @ts-ignore
           profile.value[key] = merged[key];
         }
         console.log('[fetchProfile after mergeProfile] profile.value:', profile.value);
-      } else if (result && typeof result === 'object' && 'error' in result && String(result.error).toLowerCase().includes('not found')) {
+      } else if (result && result.profile && typeof result.profile === 'object' && 'error' in result.profile && String(result.profile.error).toLowerCase().includes('not found')) {
         // If profile not found, create it and retry
         console.warn('Profile not found, creating profile...');
         await createProfile();
         // createProfile already calls fetchProfile, so return
         return;
       } else {
-        error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to fetch profile.';
+        error.value = (result && result.profile && typeof result.profile === 'object' && 'error' in result.profile) ? (result.profile.error as string) : 'Failed to fetch profile.';
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to fetch profile.';
@@ -92,12 +94,32 @@ export const useProfileStore = defineStore('profile', () => {
   async function mergeProfile(partial: Partial<UserProfile>): Promise<UserProfile> {
     console.log('[mergeProfile] backend returned:', JSON.parse(JSON.stringify(partial)));
     const { name = '', phone = '' } = partial.emergencyContact || {};
-    let profileImage = '';
+    let profileImage = partial.profileImage || ''; // Default to file ID from backend
     if (partial.profileImage) {
-      // If profileImage is a fileId, resolve to download URL
-      const res = await ApiService.getDownloadURL(partial.profileImage);
-      if (res && 'downloadURL' in res) {
-        profileImage = res.downloadURL + '?t=' + Date.now();
+      try {
+        // Try to resolve fileId to download URL
+        const res = await ApiService.getDownloadURL(partial.profileImage);
+        console.log('[mergeProfile] getDownloadURL response:', res);
+        
+        // Handle both array and object responses
+        const responseData = Array.isArray(res) ? res[0] : res;
+        
+        if (responseData && 'downloadURL' in responseData) {
+          let downloadURL = responseData.downloadURL;
+          // If it's a relative URL, prepend the backend base URL
+          if (downloadURL.startsWith('/api/')) {
+            const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+            downloadURL = baseURL.replace(/\/api$/, '') + downloadURL;
+          }
+          profileImage = downloadURL + '?t=' + Date.now();
+          console.log('[mergeProfile] Resolved profileImage to:', profileImage);
+        } else {
+          console.warn('[mergeProfile] No downloadURL in response, keeping file ID:', partial.profileImage);
+        }
+      } catch (err) {
+        console.warn('[mergeProfile] Failed to get download URL, keeping file ID:', partial.profileImage, err);
+        // Keep the file ID if download URL fetch fails
+        profileImage = partial.profileImage;
       }
     }
     // Remove genderOther if present in backend tags
@@ -144,8 +166,10 @@ export const useProfileStore = defineStore('profile', () => {
       const payload = { session, displayname };
       console.log('[updateDisplayName] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setName', payload);
-      if (result && result.error) {
-        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update display name.';
+      // Backend wraps response in msg: { msg: {} } or { msg: { error } }
+      if (result && result.msg && result.msg.error) {
+        error.value = result.msg.error;
+        throw new Error(error.value);
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update display name.';
@@ -155,49 +179,61 @@ export const useProfileStore = defineStore('profile', () => {
     }
   }
 
-  async function updateProfileImage(file: File): Promise<void> {
-    loading.value = true;
-    error.value = '';
-    try {
-      const session = getSession();
-      if (!session) throw new Error('Session not found');
-      const userId = getUserId();
-      if (!userId) throw new Error('User not found');
-      // 1. Request upload URL
-      const filename = file.name;
-      const uploadRes = await ApiService.requestUploadURL(userId, filename);
-      if (!uploadRes || 'error' in uploadRes) {
-        throw new Error(uploadRes?.error || 'Failed to get upload URL');
+  async function requestFileUpload(filename: string, contentType?: string): Promise<{ file: string; uploadURL: string; contentType?: string } | { error: string }> {
+    const session = getSession();
+    if (!session) return { error: 'Session not found' };
+    const result = await ApiService.requestUploadURL(session, filename, contentType);
+    console.log('[requestFileUpload] Raw API response:', JSON.stringify(result, null, 2));
+    
+    // Handle msg wrapper if present (backend wraps in msg with Symbols)
+    if (result && typeof result === 'object' && 'msg' in result) {
+      const msgContent = (result as any).msg;
+      console.log('[requestFileUpload] msg content:', msgContent);
+      console.log('[requestFileUpload] msg keys:', Object.keys(msgContent));
+      console.log('[requestFileUpload] msg symbols:', Object.getOwnPropertySymbols(msgContent));
+      
+      if (msgContent.error) {
+        return { error: msgContent.error };
       }
-      // 2. Upload file to uploadURL (local: PUT to /uploads/...)
-      const uploadURL = uploadRes.uploadURL;
-      const fileId = uploadRes.file;
-      const uploadResponse = await fetch(uploadURL, {
-        method: 'PUT',
-        body: file,
-      });
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file');
+      
+      // Try to get values - they might be symbols or regular properties
+      let file = msgContent.file || msgContent.fileId;
+      let uploadURL = msgContent.uploadURL;
+      let returnedContentType = msgContent.contentType;
+      
+      // If values are undefined, try to get them from symbol properties
+      if (!file || !uploadURL) {
+        const symbols = Object.getOwnPropertySymbols(msgContent);
+        for (const sym of symbols) {
+          const key = sym.toString();
+          if (key.includes('file') && !file) {
+            file = msgContent[sym];
+          }
+          if (key.includes('uploadURL') && !uploadURL) {
+            uploadURL = msgContent[sym];
+          }
+          if (key.includes('contentType') && !returnedContentType) {
+            returnedContentType = msgContent[sym];
+          }
+        }
       }
-      // 3. Confirm upload
-      const confirmRes = await ApiService.confirmUpload(fileId);
-      if (!confirmRes || 'error' in confirmRes) {
-        throw new Error(confirmRes?.error || 'Failed to confirm upload');
-      }
-      // 4. Save fileId in profile (setProfileImage)
-      const result = await ApiService.callConceptAction('UserProfile', 'setProfileImage', { session, image: fileId });
-      if (result && !result.error) {
-        // Always re-fetch the profile to ensure the image is resolved and state is in sync
-        await fetchProfile();
-      } else {
-        error.value = (result && typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update profile image.';
-      }
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update profile image.';
-      throw e;
-    } finally {
-      loading.value = false;
+      
+      console.log('[requestFileUpload] Extracted file:', file);
+      console.log('[requestFileUpload] Extracted uploadURL:', uploadURL);
+      console.log('[requestFileUpload] Extracted contentType:', returnedContentType);
+      
+      return { file, uploadURL, contentType: returnedContentType };
     }
+    
+    return result;
+  }
+
+  async function confirmFileUpload(fileId: string): Promise<{ file: string } | { error: string }> {
+    return await ApiService.confirmUpload(fileId);
+  }
+
+  async function getFileDownloadURL(fileId: string): Promise<{ downloadURL: string } | { error: string }> {
+    return await ApiService.getDownloadURL(fileId);
   }
 
   async function updateBio(bio: string): Promise<void> {
@@ -209,8 +245,10 @@ export const useProfileStore = defineStore('profile', () => {
       const payload = { session, bio };
       console.log('[updateBio] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setBio', payload);
-      if (result && result.error) {
-        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update bio.';
+      // Backend wraps response in msg: { msg: {} } or { msg: { error } }
+      if (result && result.msg && result.msg.error) {
+        error.value = result.msg.error;
+        throw new Error(error.value);
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update bio.';
@@ -229,8 +267,10 @@ export const useProfileStore = defineStore('profile', () => {
       const payload = { session, location };
       console.log('[updateLocation] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setLocation', payload);
-      if (result && result.error) {
-        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update location.';
+      // Backend wraps response in msg: { msg: {} } or { msg: { error } }
+      if (result && result.msg && result.msg.error) {
+        error.value = result.msg.error;
+        throw new Error(error.value);
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update location.';
@@ -249,8 +289,10 @@ export const useProfileStore = defineStore('profile', () => {
       const payload = { session, name, phone };
       console.log('[updateEmergencyContact] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setEmergencyContact', payload);
-      if (result && result.error) {
-        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update emergency contact.';
+      // Backend wraps response in msg: { msg: {} } or { msg: { error } }
+      if (result && result.msg && result.msg.error) {
+        error.value = result.msg.error;
+        throw new Error(error.value);
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update emergency contact.';
@@ -269,8 +311,10 @@ export const useProfileStore = defineStore('profile', () => {
       const payload = { session, tagType, value };
       console.log('[updateTag] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setTag', payload);
-      if (result && result.error) {
-        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update tag.';
+      // Backend wraps response in msg: { msg: {} } or { msg: { error } }
+      if (result && result.msg && result.msg.error) {
+        error.value = result.msg.error;
+        throw new Error(error.value);
       }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update tag.';
@@ -287,8 +331,9 @@ export const useProfileStore = defineStore('profile', () => {
       if (!session) throw new Error('Session not found');
       const payload = { session, isActive };
       const result = await ApiService.callConceptAction('UserProfile', 'setIsActive', payload);
-      if (result && result.error) {
-        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to update isActive.';
+      // Backend wraps response in msg: { msg: {} } or { msg: { error } }
+      if (result && result.msg && result.msg.error) {
+        error.value = result.msg.error;
         throw new Error(error.value);
       } else {
         profile.value.isActive = isActive;
@@ -310,12 +355,12 @@ export const useProfileStore = defineStore('profile', () => {
       const session = getSession();
       if (!session) throw new Error('Session not found');
       const result = await ApiService.callConceptAction('UserProfile', 'closeProfile', { session });
-      if (result && result.error) {
-        error.value = (typeof result === 'object' && 'error' in result) ? (result.error as string) : 'Failed to close profile.';
+      // Backend wraps response in msg: { msg: {} } or { msg: { error } }
+      if (result && result.msg && result.msg.error) {
+        error.value = result.msg.error;
         throw new Error(error.value);
       }
-      // Note: The backend DeleteUserOnAccountClose sync will automatically
-      // delete the user from PasswordAuthentication after closeProfile succeeds
+      // backend DeleteUserOnAccountClose sync will automatically delete user as well
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to close profile.';
       throw e;
@@ -330,7 +375,10 @@ export const useProfileStore = defineStore('profile', () => {
     console.log('[batchUpdateProfile] Received newProfile:', newProfile);
     try {
       const userId = getUserId();
+      const session = getSession();
       if (!userId) throw new Error('User not found');
+      if (!session) throw new Error('Session not found');
+      
       // Update each field, but do not fetch after each
       await updateDisplayName(newProfile.displayname || '');
       await updateBio(newProfile.bio || '');
@@ -344,6 +392,22 @@ export const useProfileStore = defineStore('profile', () => {
           await updateTag(tagType, tags[tagType]);
         }
       }
+      
+      // Update profile image if present (always update to ensure it's saved)
+      if (newProfile.profileImage) {
+        console.log('[batchUpdateProfile] Updating profile image:', newProfile.profileImage);
+        console.log('[batchUpdateProfile] Current profile image:', profile.value.profileImage);
+        const result = await ApiService.callConceptAction('UserProfile', 'setProfileImage', { 
+          session, 
+          image: newProfile.profileImage 
+        });
+        console.log('[batchUpdateProfile] setProfileImage result:', result);
+        // Backend wraps response in msg: { msg: {} } or { msg: { error } }
+        if (result && result.msg && result.msg.error) {
+          throw new Error('Failed to update profile image: ' + result.msg.error);
+        }
+      }
+      
       await setIsActive(true);
       // Only fetch once at the end
       await fetchProfile();
@@ -383,13 +447,15 @@ export const useProfileStore = defineStore('profile', () => {
     fetchProfile,
     createProfile,
     updateDisplayName,
-    updateProfileImage,
     updateBio,
     updateLocation,
     updateEmergencyContact,
     updateTag,
     batchUpdateProfile,
     setIsActive,
-    closeProfile
+    closeProfile,
+    requestFileUpload,
+    confirmFileUpload,
+    getFileDownloadURL
   };
 });

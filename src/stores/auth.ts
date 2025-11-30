@@ -34,7 +34,10 @@ const login = async (username: string, password: string): Promise<boolean> => {
       { user: string; session: string } | { error: string }
     >('/PasswordAuthentication/authenticate', { username, password })
 
+    console.log('[auth.login] Backend response:', response)
+
     if ('error' in response) {
+      console.log('[auth.login] Login failed with error:', response.error)
       return false
     }
 
@@ -44,13 +47,20 @@ const login = async (username: string, password: string): Promise<boolean> => {
       username: username,
     }
 
+    console.log('[auth.login] Storing user:', userData)
+    console.log('[auth.login] Storing session:', sessionToken)
+
     user.value = userData
     session.value = sessionToken
     setToStorage('user', userData)
     setToStorage('session', sessionToken)
 
+    console.log('[auth.login] After storage - session.value:', session.value)
+    console.log('[auth.login] localStorage session:', localStorage.getItem('session'))
+
     return true
   } catch (error) {
+    console.error('[auth.login] Login error:', error)
     return false
   }
 }
@@ -140,6 +150,9 @@ const changePassword = async (oldPassword: string, newPassword: string): Promise
     try {
       if (!user.value?.id) {
         return 'User not found.';
+      }
+      if (!session.value) {
+        return 'Session not found. Please log out and log in again.';
       }
       // Call closeProfile which triggers backend sync to delete user from PasswordAuthentication
       const { useProfileStore } = await import('@/stores/profile');
