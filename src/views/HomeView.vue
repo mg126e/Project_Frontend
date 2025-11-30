@@ -4,19 +4,23 @@
       <div class="logo-container">
         <img alt="RunningBuddy" class="home-logo" src="../assets/RunBuddy.png" width="240" height="240" />
       </div>
-      <p class="home-subtitle">Find your perfect running partner, set goals, and celebrate milestones together.</p>
+      <h1 class="home-headline">Find Your Running Crew</h1>
+      <p class="home-subtitle">
+        The running app built <span class="highlight">by and for college students</span>.<br>
+        Meet new people, crush your goals, and make memories one run at a time.
+      </p>
       <div class="home-actions">
-        <router-link to="/register" class="btn-primary">Register</router-link>
+        <router-link to="/register" class="btn-primary">Join Now</router-link>
         <router-link to="/login" class="btn-secondary">Log In</router-link>
       </div>
       <div class="home-features">
         <div class="feature-card">
           <h2>Find a Buddy</h2>
-          <p>Match with runners nearby for one-time or long-term runs.</p>
+          <p>Match with students for one-time or semester-long runs.</p>
         </div>
         <div class="feature-card">
           <h2>Shared Goals</h2>
-          <p>Set and track running goals with your partner.</p>
+          <p>Set and track running goals with your running buddy.</p>
         </div>
         <div class="feature-card">
           <h2>Milestone Map</h2>
@@ -43,6 +47,18 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.home-headline {
+  font-size: 2.2rem;
+  color: var(--color-primary);
+  font-family: 'Noto Serif', serif;
+  margin-bottom: 0.7rem;
+  margin-top: 0.5rem;
+  letter-spacing: 0.5px;
+}
+.highlight {
+  color: var(--color-accent, #ff9800);
+  font-weight: 700;
+}
 .home-outer {
   display: flex;
   align-items: center;
@@ -52,11 +68,14 @@ onMounted(() => {
   background: #fff;
   border-radius: 16px;
   text-align: center;
+  padding-bottom: 2.5rem;
 }
 .home-subtitle {
   color: var(--color-secondary);
   font-size: 1.2rem;
   margin-bottom: 2rem;
+  margin-top: 0.2rem;
+  line-height: 1.5;
 }
 .home-actions {
   margin-bottom: 2.5rem;
@@ -75,19 +94,15 @@ onMounted(() => {
 .btn-primary {
   background: var(--color-primary);
 }
-
 .btn-secondary {
   background: var(--color-secondary);
 }
-
 .btn-primary:hover {
   background: #106cb8;
 }
-
 .btn-secondary:hover {
   background: #092750;
 }
-
 .home-features {
   display: flex;
   flex-wrap: wrap;

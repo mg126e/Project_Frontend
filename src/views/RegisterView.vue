@@ -7,7 +7,7 @@
         <input id="register-username" v-model="username" type="text" required />
       </div>
       <div class="form-group">
-        <label for="register-email">Email</label>
+        <label for="register-email">Student Email (.edu)</label>
         <input id="register-email" v-model="email" type="email" required @input="onEmailInput" />
         <span v-if="email && email.length > 0 && !isEduEmail(email)" class="error-msg">Email must end with .edu</span>
       </div>
