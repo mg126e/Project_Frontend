@@ -114,8 +114,6 @@ async function verifyCode() {
   error.value = ''
   successMessage.value = ''
 
-  console.debug('[EmailVerification] Verifying with recordId:', verificationRecordId.value)
-  
   if (!verificationRecordId.value) {
     error.value = 'Please send a verification email first.'
     return
@@ -124,12 +122,6 @@ async function verifyCode() {
   const trimmedCode = code.value.trim()
   if (!trimmedCode) {
     error.value = 'Enter the verification code.'
-    return
-  }
-
-  if (verificationCodeEcho.value && trimmedCode === verificationCodeEcho.value) {
-    successMessage.value = 'Email verified!'
-    emit('verified')
     return
   }
 
@@ -144,9 +136,6 @@ async function verifyCode() {
       verificationRecordId: verificationRecordId.value,
       verificationCode: trimmedCode,
     })
-    
-    console.debug('[EmailVerification] Verify response:', response)
-    
     if (response.error) {
       error.value = response.error
       return
@@ -214,7 +203,7 @@ async function verifyCode() {
   cursor: not-allowed;
 }
 .btn-primary:hover:not(:disabled) {
-  background: #106cb8;
+  background: var(--color-primary-hover);
 }
 .code-entry {
   margin-top: 1.5rem;
@@ -241,7 +230,7 @@ async function verifyCode() {
   transition: color 0.2s;
 }
 .btn-link:hover {
-  color: #106cb8;
+  color: var(--color-primary-hover);
 }
 .error-msg {
   color: var(--color-error);
