@@ -43,8 +43,8 @@
             <label>Gender <span class="required-star">*</span></label>
             <select v-model="editForm.tags.gender" required>
               <option value="">Select</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
+              <option value="woman">Woman</option>
+              <option value="man">Man</option>
               <option value="other">Other</option>
             </select>
             <input

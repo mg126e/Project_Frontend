@@ -8,7 +8,7 @@
     <div v-if="loading" class="loading">Loading...</div>
     <div v-else-if="error" class="error-msg">{{ error }}</div>
     <div v-else>
-      <div class="goal-filters">
+      <div v-if="sharedGoals.length > 0" class="goal-filters">
         <div class="filter-group">
           <label for="status-filter" class="filter-label">Status:</label>
           <select id="status-filter" v-model="statusFilter" class="filter-dropdown">
@@ -324,13 +324,6 @@ section.shared-goals {
   background: #fff;
   border-radius: 24px;
   padding: 3.5rem 4.5rem 3.5rem 4.5rem;
-}
-.shared-goals h1 {
-  font-family: 'Monoton', cursive;
-  color: var(--color-primary);
-  font-size: 2rem;
-  margin-bottom: 1.5rem;
-  text-align: center;
 }
 .goal-form {
   display: flex;
