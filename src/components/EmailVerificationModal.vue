@@ -129,6 +129,8 @@ async function sendVerification() {
       console.error(`[EmailVerification] 404 - Attempted URL: ${attemptedUrl}`)
       console.error(`[EmailVerification] VITE_API_BASE_URL: ${import.meta.env.VITE_API_BASE_URL || 'NOT SET'}`)
       error.value = `API endpoint not found (404). Attempted: ${attemptedUrl}. Please set VITE_API_BASE_URL environment variable in Render to your backend URL (e.g., https://your-backend.onrender.com) and redeploy.`
+    } else if (err?.response?.status === 504 || err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+      error.value = 'The backend server is taking too long to respond. This often happens when the server is spinning up from sleep. Please wait a moment and try again.'
     } else {
       error.value = err?.response?.data?.error || err?.message || 'Failed to send verification email.'
     }
@@ -192,7 +194,12 @@ async function verifyCode() {
     // Don't navigate here - let the parent handle navigation after registration
   } catch (err: any) {
     console.error('[EmailVerification] Verify error:', err)
-    error.value = err?.response?.data?.error || err?.message || 'Invalid verification code.'
+    // Provide more helpful error messages
+    if (err?.response?.status === 504 || err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+      error.value = 'The backend server is taking too long to respond. This often happens when the server is spinning up from sleep. Please wait a moment and try again.'
+    } else {
+      error.value = err?.response?.data?.error || err?.message || 'Invalid verification code.'
+    }
   } finally {
     verifying.value = false
   }

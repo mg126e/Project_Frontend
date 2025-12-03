@@ -46,7 +46,7 @@ apiClient.interceptors.response.use(
     return response
   },
   (error) => {
-    // Clear stale session only on authentication failures (not timeouts)
+    // Clear stale session only on authentication failures (not timeouts or gateway errors)
     if (error.response?.status === 401) {
       removeFromStorage('session')
       removeFromStorage('user')
@@ -55,6 +55,11 @@ apiClient.interceptors.response.use(
       if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
         window.location.href = '/login'
       }
+    }
+
+    // Log gateway timeouts for debugging
+    if (error.response?.status === 504) {
+      console.warn('[ApiService] 504 Gateway Timeout - Backend may be spinning up from sleep')
     }
 
     return Promise.reject(error)
@@ -88,12 +93,19 @@ export class ApiService {
       }
       return responseData
     } catch (error: any) {
-      // Enhanced error logging for 404s
+      // Enhanced error logging for 404s and 504s
       if (error.response?.status === 404) {
         console.error(`[ApiService] 404 Error - Endpoint not found: ${API_BASE}/${conceptName}/${actionName}`)
         console.error(`[ApiService] API_BASE_URL: ${import.meta.env.VITE_API_BASE_URL || 'NOT SET (using default /api)'}`)
         console.error(`[ApiService] Full URL attempted: ${API_BASE}/${conceptName}/${actionName}`)
         console.error(`[ApiService] If deployed, ensure VITE_API_BASE_URL environment variable is set to your backend URL`)
+      } else if (error.response?.status === 504) {
+        console.error(`[ApiService] 504 Gateway Timeout - Backend server is taking too long to respond`)
+        console.error(`[ApiService] This often happens when Render services are spinning up from sleep`)
+        console.error(`[ApiService] Full URL attempted: ${API_BASE}/${conceptName}/${actionName}`)
+      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        console.error(`[ApiService] Request timeout - Backend did not respond within ${apiClient.defaults.timeout}ms`)
+        console.error(`[ApiService] Full URL attempted: ${API_BASE}/${conceptName}/${actionName}`)
       }
       throw error
     }
