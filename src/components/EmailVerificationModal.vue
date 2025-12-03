@@ -122,7 +122,12 @@ async function sendVerification() {
     setTimeout(() => { canResend.value = true }, 30000)
   } catch (err: any) {
     console.error('[EmailVerification] Send error:', err)
-    error.value = err?.response?.data?.error || err?.message || 'Failed to send verification email.'
+    // Provide more helpful error messages
+    if (err?.response?.status === 404) {
+      error.value = 'API endpoint not found. Please check that the backend server is running and VITE_API_BASE_URL is configured correctly.'
+    } else {
+      error.value = err?.response?.data?.error || err?.message || 'Failed to send verification email.'
+    }
     canResend.value = true
   } finally {
     sending.value = false

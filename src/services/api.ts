@@ -6,7 +6,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 // List of public endpoints that don't require session token
 const PUBLIC_ENDPOINTS = [
   '/PasswordAuthentication/register',
-  '/PasswordAuthentication/authenticate'
+  '/PasswordAuthentication/authenticate',
+  '/EmailVerification/requestVerification',
+  '/EmailVerification/verifyEmail'
 ]
 
 // Create axios instance with default configuration
@@ -76,6 +78,8 @@ export class ApiService {
   ): Promise<T> {
     try {
       const endpoint = actionName ? `/${conceptName}/${actionName}` : `/${conceptName}`
+      const fullUrl = `${API_BASE}${endpoint}`
+      console.debug(`[ApiService] Calling: ${fullUrl}`, { conceptName, actionName })
       const response = await apiClient.post(endpoint, data)
       // Unwrap { msg: {...} } wrapper from Requesting concept
       const responseData = response.data
@@ -83,7 +87,14 @@ export class ApiService {
         return responseData.msg as T
       }
       return responseData
-    } catch (error) {
+    } catch (error: any) {
+      // Enhanced error logging for 404s
+      if (error.response?.status === 404) {
+        console.error(`[ApiService] 404 Error - Endpoint not found: ${API_BASE}/${conceptName}/${actionName}`)
+        console.error(`[ApiService] API_BASE_URL: ${import.meta.env.VITE_API_BASE_URL || 'NOT SET (using default /api)'}`)
+        console.error(`[ApiService] Full URL attempted: ${API_BASE}/${conceptName}/${actionName}`)
+        console.error(`[ApiService] If deployed, ensure VITE_API_BASE_URL environment variable is set to your backend URL`)
+      }
       throw error
     }
   }
