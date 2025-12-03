@@ -124,7 +124,11 @@ async function sendVerification() {
     console.error('[EmailVerification] Send error:', err)
     // Provide more helpful error messages
     if (err?.response?.status === 404) {
-      error.value = 'API endpoint not found. Please check that the backend server is running and VITE_API_BASE_URL is configured correctly.'
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '/api (default - not set)'
+      const attemptedUrl = `${apiBase}/EmailVerification/requestVerification`
+      console.error(`[EmailVerification] 404 - Attempted URL: ${attemptedUrl}`)
+      console.error(`[EmailVerification] VITE_API_BASE_URL: ${import.meta.env.VITE_API_BASE_URL || 'NOT SET'}`)
+      error.value = `API endpoint not found (404). Attempted: ${attemptedUrl}. Please set VITE_API_BASE_URL environment variable in Render to your backend URL (e.g., https://your-backend.onrender.com) and redeploy.`
     } else {
       error.value = err?.response?.data?.error || err?.message || 'Failed to send verification email.'
     }

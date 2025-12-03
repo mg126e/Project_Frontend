@@ -79,7 +79,7 @@ export class ApiService {
     try {
       const endpoint = actionName ? `/${conceptName}/${actionName}` : `/${conceptName}`
       const fullUrl = `${API_BASE}${endpoint}`
-      console.debug(`[ApiService] Calling: ${fullUrl}`, { conceptName, actionName })
+      console.log(`[ApiService] Calling: ${fullUrl}`, { conceptName, actionName, API_BASE })
       const response = await apiClient.post(endpoint, data)
       // Unwrap { msg: {...} } wrapper from Requesting concept
       const responseData = response.data
