@@ -55,7 +55,7 @@ const profileImageUrl = 'https://media.istockphoto.com/id/628317758/vector/fit-c
   object-fit: cover;
   border: 3px solid var(--color-primary);
   margin-right: 1.7rem;
-  background: #fff;
+  background: #F9FAFB;
 }
 .profile-info {
   flex: 1;
@@ -102,19 +102,27 @@ const profileImageUrl = 'https://media.istockphoto.com/id/628317758/vector/fit-c
   color: #b23b3b;
 }
 .btn-primary {
-  background: var(--color-primary);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--color-primary);
   border: none;
   border-radius: 6px;
   padding: 0.7em 1.5em;
   font-weight: 600;
   font-size: 1.05rem;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, box-shadow 0.2s;
   align-self: flex-start;
   margin-top: 0.7rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  font-family: 'Open Sans', Arial, sans-serif;
 }
+
 .btn-primary:hover {
-  background: var(--color-primary-dark);
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 </style>

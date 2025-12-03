@@ -1,9 +1,10 @@
 <template>
   <div class="dashboard-layout">
     <nav class="topbar">
-      <h1>RunBuddy</h1>
+      <router-link to="/dashboard" class="topbar-logo">
+        <h1>RunBuddy</h1>
+      </router-link>
       <ul>
-        <li><router-link to="/dashboard">Dashboard</router-link></li>
         <li><router-link to="/matches">Matches</router-link></li>
         <li><router-link to="/messages">Messages</router-link></li>
         <li><router-link to="/goals">Shared Goals</router-link></li>
@@ -58,7 +59,7 @@ export default {
 }
 .topbar {
   width: 100%;
-  background: #fff;
+  background: #F9FAFB;
   border-bottom: 1.5px solid var(--color-primary-border);
   display: flex;
   align-items: center;
@@ -95,7 +96,7 @@ export default {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--color-accent, orange);
+  background: var(--color-accent, #f1a238);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -116,7 +117,15 @@ export default {
 .topbar ul li {
   margin: 0;
 }
-.topbar a {
+.topbar-logo {
+  text-decoration: none;
+  color: var(--color-primary);
+}
+.topbar-logo:hover {
+  background: none;
+  color: var(--color-primary);
+}
+.topbar ul a {
   color: var(--color-primary);
   text-decoration: none;
   font-weight: 600;
@@ -126,7 +135,7 @@ export default {
   transition: background 0.18s, color 0.18s;
   display: block;
 }
-.topbar a:hover {
+.topbar ul a:hover {
   background: var(--color-primary-light);
   color: var(--color-primary-dark);
 }

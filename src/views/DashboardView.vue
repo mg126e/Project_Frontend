@@ -46,14 +46,16 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 
 
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useProfileStore } from '../stores/profile';
 import { useSharedGoalsStore } from '../stores/sharedGoals';
+import { getFromStorage, setToStorage } from '../utils';
+import { ApiService } from '../services/api';
 import ProfileSnapshotModal from '../components/ProfileSnapshotModal.vue';
 
 const auth = useAuthStore();
@@ -74,32 +76,30 @@ const stats = ref({
   messages: 0,
 });
 
-// Use the same test profile as PartnerMatchingView for the pending invite
-const testProfile = {
-  _id: 'test202',
-  displayname: 'Best Runner In The World',
-  profileImage: '019ad70c-2c9d-7e39-b015-4085b7bfb45b',
-  bio: 'Trying out running!',
-  location: 'Boston, MA',
-  emergencyContact: { name: 'Sally', phone: '123-456-7891' },
-  tags: {
-    gender: 'woman',
-    age: 21,
-    runningLevel: 'beginner',
-    runningPace: '8:30',
-    personality: 'introvert'
-  },
-  isActive: true
-};
+// Get list of handled invite IDs from localStorage
+function getHandledInviteIds(): string[] {
+  return getFromStorage<string[]>('handledInviteIds', []);
+}
 
-const pendingInvites = ref([
-  {
-    id: '1',
-    from: testProfile.displayname,
-    message: 'Would you like to join my running group?',
-    profile: testProfile,
-  },
-]);
+// Save an invite ID as handled
+function markInviteAsHandled(id: string) {
+  const handled = getHandledInviteIds();
+  if (!handled.includes(id)) {
+    handled.push(id);
+    setToStorage('handledInviteIds', handled);
+  }
+}
+
+// All available invites (TODO: Replace with real API call)
+const allInvites = [
+  // Invites will be populated from API
+];
+
+// Filter out handled invites
+const handledIds = getHandledInviteIds();
+const pendingInvites = ref(
+  allInvites.filter(invite => !handledIds.includes(invite.id))
+);
 
 const showProfileModal = ref(false);
 const modalProfile = ref(null);
@@ -113,27 +113,65 @@ function closeProfileModal() {
   modalProfile.value = null;
 }
 
-function acceptInvite(id) {
+async function acceptInvite(id) {
   // TODO: Replace with real API call
+  markInviteAsHandled(id);
   pendingInvites.value = pendingInvites.value.filter(invite => invite.id !== id);
+  // Wait for Vue to update the DOM before navigating
+  await nextTick();
   // Optionally show a toast/notification
   router.push('/messages');
 }
 
 function declineInvite(id) {
   // TODO: Replace with real API call
+  markInviteAsHandled(id);
   pendingInvites.value = pendingInvites.value.filter(invite => invite.id !== id);
   // Optionally show a toast/notification
+}
+
+async function fetchMatches() {
+  if (!auth.user?.id) {
+    stats.value.matches = 0;
+    return;
+  }
+
+  try {
+    // Use the correct endpoint: _getMatches from OneRunMatching concept
+    const result = await ApiService.callConceptAction<Array<{ _id: string; userA: string; userB: string; completed: boolean }>>(
+      'OneRunMatching',
+      '_getMatches',
+      { user: auth.user.id }
+    );
+    
+    // Handle different response formats
+    let matches: Array<{ _id: string; userA: string; userB: string; completed: boolean }> = [];
+    if (Array.isArray(result)) {
+      matches = result;
+    } else if (result && typeof result === 'object' && 'matches' in result && Array.isArray(result.matches)) {
+      matches = result.matches;
+    }
+    
+    // Filter to only active (non-completed) runs
+    const activeMatches = matches.filter((run) => run && !run.completed);
+    stats.value.matches = activeMatches.length;
+  } catch (e: any) {
+    console.warn('Failed to fetch matches from API:', e?.message || e);
+    // Fallback to profile matches if API call fails
+    const profile = profileStore.profile;
+    stats.value.matches = profile?.matches?.length || 0;
+    // Don't show error to user, just use fallback
+  }
 }
 
 onMounted(async () => {
   await profileStore.fetchProfile();
   await sharedGoalsStore.fetchAllSharedGoalsForUser(auth.user.id);
+  await fetchMatches();
   
   const profile = profileStore.profile;
   stats.value.goals = sharedGoalsStore.sharedGoals.length;
   stats.value.milestones = profile?.milestones?.length || 0;
-  stats.value.matches = profile?.matches?.length || 0;
   stats.value.messages = profile?.messages?.length || 0;
 });
 </script>
@@ -142,7 +180,7 @@ onMounted(async () => {
 .dashboard-home {
   max-width: 700px;
   margin: 2.5rem auto;
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 16px;
   padding: 2.5rem 3.5rem 2.2rem 3.5rem;
   text-align: center;
@@ -167,7 +205,7 @@ onMounted(async () => {
   gap: 1.2rem;
 }
 .invite-card {
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 8px;
   padding: 1.1rem 1.5rem;
   display: flex;
@@ -206,7 +244,7 @@ onMounted(async () => {
   background: var(--color-primary-dark);
 }
 .btn-decline {
-  background: #fff;
+  background: #F9FAFB;
   color: var(--color-error);
   border: 1.5px solid var(--color-error);
   border-radius: 6px;
@@ -223,7 +261,7 @@ onMounted(async () => {
 .dashboard-home {
   max-width: 700px;
   margin: 2.5rem auto;
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 16px;
   padding: 2.5rem 3.5rem 2.2rem 3.5rem;
   text-align: center;
@@ -289,7 +327,7 @@ onMounted(async () => {
   transition: color 0.2s, background 0.2s;
 }
 .profile-link:hover {
-  background: #ffeae1;
+  background: #fdf4e8;
   text-decoration: none;
 }
 </style>

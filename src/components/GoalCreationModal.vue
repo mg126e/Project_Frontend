@@ -496,7 +496,7 @@ async function saveGoal() {
 }
 .next-button:disabled,
 .primary-button:disabled {
-  background: #ffd6c2;
+  background: #fae8d3;
   color: #fff;
   opacity: 0.6;
   cursor: not-allowed;
@@ -546,7 +546,7 @@ async function saveGoal() {
 .edit-step-input:focus {
   outline: none;
   border-color: var(--color-primary);
-  background: #fff;
+  background: #F9FAFB;
 }
 .error-message {
   color: var(--color-error);

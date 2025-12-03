@@ -56,7 +56,7 @@ onMounted(() => {
   letter-spacing: 0.5px;
 }
 .highlight {
-  color: var(--color-accent, #ff9800);
+  color: var(--color-accent, #f1a238);
   font-weight: 700;
 }
 .home-outer {
@@ -65,7 +65,7 @@ onMounted(() => {
   justify-content: center;
 }
 .home {
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 16px;
   text-align: center;
   padding-bottom: 2.5rem;

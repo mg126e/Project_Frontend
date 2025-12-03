@@ -98,7 +98,7 @@ async function onSubmit() {
   max-width: 95vw;
   padding: 2.2rem 2.2rem 1.5rem 2.2rem;
   border-radius: 16px;
-  background: #fff;
+  background: #F9FAFB;
   position: relative;
   border: 1.5px solid var(--color-primary-border);
 }

@@ -53,7 +53,7 @@ function close() {
   z-index: 1000;
 }
 .modal-content {
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 18px;
   min-width: 340px;
   max-width: 420px;
@@ -82,7 +82,7 @@ function close() {
   border-radius: 50%;
   object-fit: cover;
   border: 3px solid var(--color-primary);
-  background: #fff;
+  background: #F9FAFB;
 }
 .profile-name {
   margin: 0;

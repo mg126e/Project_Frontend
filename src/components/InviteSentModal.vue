@@ -39,7 +39,7 @@ function close() {
   z-index: 1000;
 }
 .modal-content {
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 18px;
   max-width: 400px;
   width: 100%;

@@ -221,7 +221,7 @@ onMounted(loadGoal);
 }
 
 .active-goal-section {
-  background: #ffffff;
+  background: #F9FAFB;
   border-radius: 24px;
   padding: 2rem;
   margin-bottom: 2rem;
@@ -295,7 +295,7 @@ onMounted(loadGoal);
 }
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ffc5b3, var(--color-accent));
+  background: linear-gradient(90deg, #f8d5b0, var(--color-accent));
   border-radius: 6px;
   transition: width 0.3s ease;
 }
@@ -322,7 +322,7 @@ onMounted(loadGoal);
   gap: 1rem;
   padding: 1.5rem;
   border-radius: 8px;
-  background: #fff;
+  background: #F9FAFB;
   transition: border-color 0.2s, background 0.2s;
 }
 .step-item.completed {

@@ -33,7 +33,7 @@
 
 <script setup>
 
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import EmailVerificationModal from '../components/EmailVerificationModal.vue'
@@ -76,11 +76,21 @@ async function onRegister() {
 }
 
 // Step 2: After code is verified, register the user
-async function handleVerified({ verificationCode }) {
+async function handleVerified({ verificationRecordId: recordId, verificationCode: code }) {
+  // Store the verificationRecordId from the modal response
+  if (recordId) {
+    verificationRecordId.value = recordId
+  }
+  console.log('[RegisterView] Registration with:', {
+    username: username.value,
+    email: email.value,
+    verificationRecordId: recordId || verificationRecordId.value,
+    verificationCode: code
+  })
   // Call the registration endpoint after successful verification
   loading.value = true
   try {
-    const regResponse = await authRegisterAfterVerification(username.value, password.value, email.value, verificationRecordId.value, verificationCode)
+    const regResponse = await authRegisterAfterVerification(username.value, password.value, email.value, recordId || verificationRecordId.value, code)
     console.log('Registration response:', regResponse)
     if (regResponse.error) {
       error.value = regResponse.error
@@ -97,6 +107,7 @@ async function handleVerified({ verificationCode }) {
       }
       auth.user = userData
       auth.session = regResponse.session
+      auth.ready = true
       setToStorage('user', userData)
       setToStorage('session', regResponse.session)
       // Fetch the profile that was created after verification
@@ -109,7 +120,10 @@ async function handleVerified({ verificationCode }) {
       }
       showVerifyModal.value = false
       loading.value = false
-      router.push('/dashboard')
+      // Wait for Vue to update reactive state before navigating
+      await nextTick()
+      // New users should go to profile first to set up their profile
+      router.push({ name: 'profile' })
     } else {
       error.value = 'Registration succeeded but user/session missing. Please log in.'
       loading.value = false
@@ -135,16 +149,38 @@ async function authRequestVerification(username, email) {
 async function authRegisterAfterVerification(username, password, email, verificationRecordId, verificationCode) {
   try {
     const { ApiService } = await import('@/services/api')
-    // This endpoint should check verification and create the user
-    return await ApiService.post('/PasswordAuthentication/register', {
+    const payload = {
       username,
       password,
       email,
       verificationRecordId,
       verificationCode
-    })
+    }
+    console.log('[RegisterView] Sending registration request:', { ...payload, password: '***' })
+    console.log('[RegisterView] API endpoint: /PasswordAuthentication/register')
+    // This endpoint should check verification and create the user
+    const response = await ApiService.post('/PasswordAuthentication/register', payload)
+    console.log('[RegisterView] Registration response received:', response)
+    return response
   } catch (e) {
-    return { error: e?.message || 'Failed to register after verification.' }
+    console.error('[RegisterView] Registration error:', e)
+    // Extract more detailed error information
+    let errorMessage = 'Failed to register after verification.'
+    if (e?.code === 'ECONNABORTED' || e?.message?.includes('timeout')) {
+      errorMessage = 'Request timed out. The backend server may be slow or unavailable. Please try again.'
+    } else if (e?.response?.status === 504) {
+      errorMessage = 'Gateway timeout. The backend server is taking too long to respond. Please check if the backend server is running and try again.'
+    } else if (e?.response?.status === 500) {
+      errorMessage = 'Server error. Please try again later.'
+    } else if (e?.response?.status === 400) {
+      errorMessage = e?.response?.data?.error || 'Invalid request. Please check your information and try again.'
+    } else if (e?.response?.data?.error) {
+      errorMessage = e.response.data.error
+    } else if (e?.message) {
+      errorMessage = e.message
+    }
+    console.error('[RegisterView] Error message:', errorMessage)
+    return { error: errorMessage }
   }
 }
 </script>
@@ -153,7 +189,7 @@ async function authRegisterAfterVerification(username, password, email, verifica
 .auth-form {
   max-width: 400px;
   margin: 2rem auto;
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 16px;
   padding: 2rem 2.5rem;
 }

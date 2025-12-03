@@ -14,7 +14,7 @@
 <style scoped>
 .milestone-map-page {
   min-width: 800px;
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 24px;
   padding: 3.5rem 4.5rem 3.5rem 4.5rem;
 }

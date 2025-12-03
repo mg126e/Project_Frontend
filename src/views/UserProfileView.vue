@@ -491,7 +491,7 @@ function onPasswordChanged(msg) {
 .profile-edit {
   width: 700px;
   margin: 3.5rem auto 0 auto;
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 16px;
   padding: 2.5rem 3.5rem 2.2rem 3.5rem;
   position: relative;
@@ -535,7 +535,7 @@ function onPasswordChanged(msg) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 8px;
   padding: 0.5em 1em;
   font-size: 1.05rem;
@@ -560,7 +560,7 @@ function onPasswordChanged(msg) {
   height: 130px;
   border-radius: 50%;
   object-fit: cover;
-  background: #fff;
+  background: #F9FAFB;
 }
 
 .profile-username-top {
@@ -575,7 +575,7 @@ function onPasswordChanged(msg) {
   width: 130px;
   height: 130px;
   border-radius: 50%;
-  background: var(--color-accent, orange);
+  background: var(--color-accent, #f1a238);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -594,7 +594,7 @@ function onPasswordChanged(msg) {
   gap: 2.5rem;
 }
 .profile-bottom-left, .profile-bottom-right {
-  background: #fff;
+  background: #F9FAFB;
   border-radius: 8px;
   padding: 1em 1.2em;
   font-size: 1.08rem;
@@ -664,7 +664,7 @@ function onPasswordChanged(msg) {
   height: 110px;
   border-radius: 50%;
   object-fit: cover;
-  background: #fff;
+  background: #F9FAFB;
   border: 2.5px solid var(--color-primary);
 }
 .profile-fallback-avatar {

@@ -173,9 +173,14 @@ async function verifyCode() {
       }
     }
     successMessage.value = 'Email verified!'
-    emit('verified', response)
+    // Emit both verificationRecordId and verificationCode for registration
+    emit('verified', {
+      ...response,
+      verificationRecordId: verificationRecordId.value,
+      verificationCode: trimmedCode,
+    })
     emit('close')
-    router.push('/dashboard')
+    // Don't navigate here - let the parent handle navigation after registration
   } catch (err: any) {
     console.error('[EmailVerification] Verify error:', err)
     error.value = err?.response?.data?.error || err?.message || 'Invalid verification code.'
@@ -203,7 +208,7 @@ async function verifyCode() {
   max-width: 95vw;
   padding: 2.2rem 2.2rem 1.5rem 2.2rem;
   border-radius: 16px;
-  background: #fff;
+  background: #F9FAFB;
   position: relative;
   border: 1.5px solid var(--color-primary-border);
   text-align: center;

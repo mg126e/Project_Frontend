@@ -10,6 +10,7 @@ const router = createRouter({
 			path: '/',
 			name: 'home',
 			component: () => import('../views/HomeView.vue'),
+			meta: { requiresGuest: true },
 		},
 		{
 			path: '/login',
@@ -24,7 +25,7 @@ const router = createRouter({
 			meta: { requiresGuest: true },
 		},
 		{
-			path: '/',
+			path: '',
 			component: () => import('../components/DashboardLayout.vue'),
 			meta: { requiresAuth: true },
 			children: [
@@ -57,6 +58,11 @@ const router = createRouter({
 					path: 'matches',
 					name: 'partner-matching',
 					component: () => import('../views/PartnerMatchingView.vue'),
+				},
+				{
+					path: 'matches/partner',
+					name: 'partner-matching-list',
+					component: () => import('../views/PartnerMatchingListView.vue'),
 				},
 				{
 					path: 'match/:id',
@@ -111,6 +117,12 @@ router.beforeEach(async (to, from, next) => {
 				);
 			});
 		}
+		
+		// Redirect authenticated users away from home page
+		if (to.path === '/' && auth.user) {
+			return next({ path: '/dashboard' });
+		}
+		
 		if (to.matched.some(record => record.meta.requiresAuth)) {
 			if (!auth.user) {
 				return next({ name: 'login', query: { redirect: to.fullPath } });
