@@ -173,8 +173,39 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
         return result
       }
 
+      // Automatically create a chat between the inviter and accepter
+      try {
+        await ApiService.callConceptAction<{ thread: string } | { error: string }>(
+          'Messaging',
+          'startChat',
+          {
+            userA: invite.inviter,
+            userB: userId,
+          }
+        )
+        // Chat creation is best-effort; we don't fail if it doesn't work
+      } catch (e) {
+        console.warn('Failed to create chat after accepting invite:', e)
+        // Continue even if chat creation fails
+      }
+
       // Refresh invites and runs after accepting
+      // This ensures the accepted invite is removed from all users' received invites lists
       await Promise.all([fetchUserInvites(), fetchMatches()])
+      
+      // Also immediately remove the accepted invite from local state as a safeguard
+      invites.value = invites.value.filter((inv) => {
+        // Remove if it's the accepted invite, OR if it's a received invite that's now accepted
+        if (inv._id === inviteId) {
+          return false // Remove the invite that was just accepted
+        }
+        // Keep pending received invites, remove accepted/declined received invites
+        if (inv.inviter !== userId && inv.invitees.includes(userId)) {
+          return inv.acceptanceStatus === 'pending'
+        }
+        return true
+      })
+      
       return result
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : 'Failed to accept invite'
@@ -284,8 +315,11 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
     }
   }
 
-  // Fetch user's invites
-  async function fetchUserInvites(): Promise<void> {
+  // Fetch user's invites (both created and received)
+  // The backend _getInvitesForUser query now handles both:
+  // - Created invites (where user is inviter)
+  // - Received invites (where user is in invitees array and status is 'pending')
+  async function fetchUserInvites(region?: string): Promise<void> {
     loading.value = true
     error.value = ''
     try {
@@ -294,9 +328,6 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
         return
       }
 
-      // Try to fetch invites from backend
-      // Note: This requires backend to implement a query like _getInvitesForUser
-      // For now, we'll try to use a helper query if available
       try {
         const result = await ApiService.callConceptAction<Invite[]>(
           'OneRunMatching',
@@ -305,11 +336,12 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
         )
         if (Array.isArray(result)) {
           invites.value = result
+        } else {
+          invites.value = []
         }
       } catch (e) {
-        // If query doesn't exist yet, we'll need to implement it in backend
-        // For now, set empty array
-        console.warn('Invites query not available yet, backend needs to implement _getInvitesForUser')
+        console.error('Failed to fetch invites:', e)
+        error.value = e instanceof Error ? e.message : 'Failed to fetch invites'
         invites.value = []
       }
     } catch (e) {
@@ -377,6 +409,57 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
 
   const activeRuns = computed(() => runs.value.filter((run) => !run.completed))
 
+  // Fetch a single run by ID
+  async function fetchRun(runId: string): Promise<Run | null> {
+    try {
+      // Try to fetch from backend if a query exists
+      try {
+        const result = await ApiService.callConceptAction<Run>(
+          'OneRunMatching',
+          '_getRun',
+          { run: runId }
+        )
+        return result || null
+      } catch (e) {
+        // If query doesn't exist, try to find in existing runs
+        return runs.value.find((run) => run._id === runId) || null
+      }
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to fetch run'
+      return null
+    }
+  }
+
+  // Find the invite associated with a run
+  // The invite should have status "accepted" and match the run's users
+  async function findInviteForRun(run: Run): Promise<Invite | null> {
+    try {
+      const userId = getUserId()
+      if (!userId) return null
+
+      // Fetch all invites to search for the matching one
+      await fetchUserInvites()
+
+      // Look for an accepted invite where:
+      // - The inviter is userA and userB is in invitees, OR
+      // - The inviter is userB and userA is in invitees
+      // - Status is "accepted"
+      const matchingInvite = invites.value.find((inv) => {
+        if (inv.acceptanceStatus !== 'accepted') return false
+        // Check if invite matches the run's users
+        return (
+          (inv.inviter === run.userA && inv.invitees.includes(run.userB)) ||
+          (inv.inviter === run.userB && inv.invitees.includes(run.userA))
+        )
+      })
+
+      return matchingInvite || null
+    } catch (e) {
+      console.error('Error finding invite for run:', e)
+      return null
+    }
+  }
+
   return {
     invites,
     runs,
@@ -394,6 +477,8 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
     fetchUserInvites,
     fetchMatches,
     fetchInvite,
+    fetchRun,
+    findInviteForRun,
   }
 })
 

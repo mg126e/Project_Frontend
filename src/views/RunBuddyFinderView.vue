@@ -76,7 +76,6 @@
               <p><strong>Distance:</strong> {{ invite.distance }} miles</p>
               <p><strong>Location:</strong> {{ invite.location }}</p>
               <p><strong>Region:</strong> {{ invite.region }}</p>
-              <p v-if="invite.sent && invite.invitees.length > 0"><strong>Invited:</strong> {{ invite.invitees.length }} user(s)</p>
             </div>
           </div>
           <div class="invite-actions">
@@ -176,8 +175,18 @@ const newInvite = ref({
 // Computed
 const error = computed(() => oneRunStore.error)
 const invitesCreated = computed(() => oneRunStore.invites.filter(inv => inv.inviter === authStore.user?.id))
-const invitesReceived = computed(() => oneRunStore.invites.filter(inv => inv.sent && inv.acceptanceStatus === 'pending' && inv.inviter !== authStore.user?.id))
-const activeRuns = computed(() => oneRunStore.activeRuns)
+const invitesReceived = computed(() => {
+  const userId = authStore.user?.id
+  if (!userId) return []
+  // Only show pending invites - accepted invites should never appear here
+  // Once an invite is accepted, it's removed so no other users can accept it
+  return oneRunStore.invites.filter(inv => 
+    inv.sent && 
+    inv.acceptanceStatus === 'pending' && 
+    inv.inviter !== userId &&
+    inv.invitees.includes(userId)
+  )
+})
 
 const minDateTime = computed(() => {
   const now = new Date()
@@ -193,6 +202,7 @@ const canCreateInvite = computed(() => {
     newInvite.value.region
   )
 })
+const activeRuns = computed(() => oneRunStore.activeRuns)
 
 // Methods
 function formatDate(dateString: string): string {
@@ -327,9 +337,16 @@ async function loadData() {
     }
 
     // Load invites and runs
+    const region = newInvite.value.region || (profileStore.profile.location ? 
+      (() => {
+        const location = profileStore.profile.location
+        const parts = location.split(',')
+        return parts.length > 1 ? parts[parts.length - 1].trim() : location.trim()
+      })() : undefined)
+    
     await Promise.all([
       oneRunStore.fetchMatches(),
-      oneRunStore.fetchUserInvites(),
+      oneRunStore.fetchUserInvites(region),
     ])
   } finally {
     loading.value = false
@@ -597,12 +614,12 @@ onMounted(() => {
 }
 
 .btn-complete {
-  background: var(--color-success);
+  background: #95d95d;
   color: #fff;
 }
 
 .btn-complete:hover:not(:disabled) {
-  background: #2e7d32;
+  background: #7bc047;
 }
 
 .btn-view {
