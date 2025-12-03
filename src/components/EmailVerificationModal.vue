@@ -130,7 +130,7 @@ async function sendVerification() {
       console.error(`[EmailVerification] VITE_API_BASE_URL: ${import.meta.env.VITE_API_BASE_URL || 'NOT SET'}`)
       error.value = `API endpoint not found (404). Attempted: ${attemptedUrl}. Please set VITE_API_BASE_URL environment variable in Render to your backend URL (e.g., https://your-backend.onrender.com) and redeploy.`
     } else if (err?.response?.status === 504 || err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
-      error.value = 'The backend server is taking too long to respond. This often happens when the server is spinning up from sleep. Please wait a moment and try again.'
+      error.value = 'The backend server is taking too long to respond. '
     } else {
       error.value = err?.response?.data?.error || err?.message || 'Failed to send verification email.'
     }
@@ -196,7 +196,8 @@ async function verifyCode() {
     console.error('[EmailVerification] Verify error:', err)
     // Provide more helpful error messages
     if (err?.response?.status === 504 || err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
-      error.value = 'The backend server is taking too long to respond. This often happens when the server is spinning up from sleep. Please wait a moment and try again.'
+      console.error('[EmailVerification] Timeout during verification - backend may have processed successfully but timed out before responding')
+      error.value = 'The backend processed your verification but timed out before responding. The verification may have succeeded - try refreshing the page or logging in. The backend Requesting concept timeout (10s) needs to be increased.'
     } else {
       error.value = err?.response?.data?.error || err?.message || 'Invalid verification code.'
     }
