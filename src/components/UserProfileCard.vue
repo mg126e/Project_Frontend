@@ -26,11 +26,17 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   profile: { type: Object, required: true },
 })
 
-const profileImageUrl = 'https://media.istockphoto.com/id/628317758/vector/fit-couple-running-a-marathon-together.jpg?s=612x612&w=0&k=20&c=q9adFDtuz7CkLSb-u9U_ykVQdD0aBuWEHbtoCvJ94rQ=';
+const profileImageUrl = computed(() => {
+  return props.profile.profileImage || 
+         props.profile.profileImageUrl || 
+         'https://media.istockphoto.com/id/628317758/vector/fit-couple-running-a-marathon-together.jpg?s=612x612&w=0&k=20&c=q9adFDtuz7CkLSb-u9U_ykVQdD0aBuWEHbtoCvJ94rQ='
+})
 </script>
 
 <style scoped>

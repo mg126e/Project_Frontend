@@ -129,7 +129,6 @@
         <div v-for="run in activeRuns" :key="run._id" class="run-card">
           <div class="run-info">
             <h3>Run with Partner</h3>
-            <p>Run ID: {{ run._id.slice(0, 8) }}...</p>
           </div>
           <div class="run-actions">
             <router-link :to="`/run/${run._id}`" class="btn-view">View Details</router-link>

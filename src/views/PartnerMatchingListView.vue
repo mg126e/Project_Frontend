@@ -1,61 +1,88 @@
 <template>
   <section class="partner-matching-page">
     <h1>Find a Running Partner</h1>
-    <div class="partner-filters">
-  <div class="filter-group">
-    <label for="location-filter" class="filter-label">Location:</label>
-    <select id="location-filter" v-model="locationFilter" class="filter-dropdown">
-      <option value="all">All</option>
-      <option v-for="loc in locationOptions" :key="loc" :value="loc">{{ loc }}</option>
-    </select>
-  </div>
-  <div class="filter-group">
-    <label for="level-filter" class="filter-label">Level:</label>
-    <select id="level-filter" v-model="levelFilter" class="filter-dropdown">
-      <option value="all">All</option>
-      <option v-for="lvl in levelOptions" :key="lvl" :value="lvl">{{ lvl.charAt(0).toUpperCase() + lvl.slice(1) }}</option>
-    </select>
-  </div>
-  <div class="filter-group">
-    <label for="gender-filter" class="filter-label">Gender:</label>
-    <select id="gender-filter" v-model="genderFilter" class="filter-dropdown">
-      <option value="all">All</option>
-      <option v-for="g in genderOptions" :key="g" :value="g">{{ g.charAt(0).toUpperCase() + g.slice(1) }}</option>
-    </select>
-  </div>
-</div>
-<div class="profiles-list">
-  <UserProfileCard
-    v-for="p in filteredProfiles"
-    :key="p._id"
-    :profile="p"
-    @send-invite="openInviteModal"
-  />
-</div>
-<ConfirmActionModal
-  v-if="showInviteModal"
-  :title="'Send Invite'"
-  :message="inviteModalMessage"
-  confirmText="Send Invite"
-  confirmClass="accent"
-  @close="showInviteModal = false"
-  @confirm="confirmSendInvite"
-/>
+    
+    <div v-if="error" class="error-banner">
+      {{ error }}
+    </div>
+    
+    <div v-if="loading && profiles.length === 0" class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading users in your area...</p>
+    </div>
+    
+    <template v-else>
+      <div class="partner-filters">
+        <div class="filter-group">
+          <label for="location-filter" class="filter-label">Location:</label>
+          <select id="location-filter" v-model="locationFilter" class="filter-dropdown">
+            <option value="all">All</option>
+            <option v-for="loc in locationOptions" :key="loc" :value="loc">{{ loc }}</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="level-filter" class="filter-label">Level:</label>
+          <select id="level-filter" v-model="levelFilter" class="filter-dropdown">
+            <option value="all">All</option>
+            <option v-for="lvl in levelOptions" :key="lvl" :value="lvl">{{ lvl.charAt(0).toUpperCase() + lvl.slice(1) }}</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="gender-filter" class="filter-label">Gender:</label>
+          <select id="gender-filter" v-model="genderFilter" class="filter-dropdown">
+            <option value="all">All</option>
+            <option v-for="g in genderOptions" :key="g" :value="g">{{ g.charAt(0).toUpperCase() + g.slice(1) }}</option>
+          </select>
+        </div>
+      </div>
+      
+      <div v-if="filteredProfiles.length === 0 && !loading" class="empty-state">
+        <p>No users found in your area. Try adjusting your filters or check back later!</p>
+      </div>
+      
+      <div v-else class="profiles-list">
+        <UserProfileCard
+          v-for="p in filteredProfiles"
+          :key="p._id || p.userId"
+          :profile="p"
+          @send-invite="openInviteModal"
+        />
+      </div>
+    </template>
+    
+    <ConfirmActionModal
+      v-if="showInviteModal"
+      :title="'Send Invite'"
+      :message="inviteModalMessage"
+      confirmText="Send Invite"
+      confirmClass="accent"
+      @close="showInviteModal = false"
+      @confirm="confirmSendInvite"
+    />
 
-<InviteSentModal
-  v-if="showSentModal"
-  :recipient="sentInviteProfile?.displayname || ''"
-  @close="showSentModal = false"
-/>
+    <InviteSentModal
+      v-if="showSentModal"
+      :recipient="sentInviteProfile?.displayname || ''"
+      @close="showSentModal = false"
+    />
   </section>
 </template>
 
-<script setup>
-
+<script setup lang="ts">
 import InviteSentModal from '../components/InviteSentModal.vue'
 import ConfirmActionModal from '../components/ConfirmActionModal.vue'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import UserProfileCard from '../components/UserProfileCard.vue'
+import { ApiService } from '../services/api'
+import { useProfileStore } from '../stores/profile'
+import { useAuthStore } from '../stores/auth'
+
+const profileStore = useProfileStore()
+const authStore = useAuthStore()
+
+// Loading and error states
+const loading = ref(false)
+const error = ref('')
 
 // Invite modal state
 const showInviteModal = ref(false)
@@ -82,9 +109,7 @@ function confirmSendInvite() {
 }
 
 // Profiles array - will be populated from API
-const profiles = ref([
-  // Profiles will be fetched from API
-])
+const profiles = ref([])
 
 const locationFilter = ref('all')
 const levelFilter = ref('all')
@@ -113,9 +138,14 @@ const genderOptions = computed(() => {
   return result
 })
 
-// Filtered profiles
+// Filtered profiles (excluding current user)
 const filteredProfiles = computed(() => {
+  const currentUserId = authStore.user?.id
   return profiles.value.filter(p => {
+    // Exclude current user
+    if (p._id === currentUserId || p.userId === currentUserId) {
+      return false
+    }
     const locMatch = locationFilter.value === 'all' || p.location === locationFilter.value
     const levelMatch = levelFilter.value === 'all' || p.tags?.runningLevel === levelFilter.value
     let genderMatch = true
@@ -126,6 +156,155 @@ const filteredProfiles = computed(() => {
     }
     return locMatch && levelMatch && genderMatch
   })
+})
+
+// Helper function to resolve profile image URL
+async function resolveProfileImage(profileImage: string | undefined): Promise<string> {
+  if (!profileImage) {
+    return 'https://media.istockphoto.com/id/628317758/vector/fit-couple-running-a-marathon-together.jpg?s=612x612&w=0&k=20&c=q9adFDtuz7CkLSb-u9U_ykVQdD0aBuWEHbtoCvJ94rQ='
+  }
+  
+  try {
+    const res = await ApiService.getDownloadURL(profileImage)
+    const responseData = Array.isArray(res) ? res[0] : res
+    
+    if (responseData && 'downloadURL' in responseData) {
+      let downloadURL = responseData.downloadURL
+      if (downloadURL.startsWith('/api/')) {
+        const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+        downloadURL = baseURL.replace(/\/api$/, '') + downloadURL
+      }
+      return downloadURL + '?t=' + Date.now()
+    }
+  } catch (err) {
+    console.warn('Failed to resolve profile image:', err)
+  }
+  
+  return 'https://media.istockphoto.com/id/628317758/vector/fit-couple-running-a-marathon-together.jpg?s=612x612&w=0&k=20&c=q9adFDtuz7CkLSb-u9U_ykVQdD0aBuWEHbtoCvJ94rQ='
+}
+
+// Fetch all users in the area
+async function fetchUsersInArea() {
+  loading.value = true
+  error.value = ''
+  
+  try {
+    // First, ensure we have the current user's profile to get their location
+    if (!profileStore.profile.location) {
+      await profileStore.fetchProfile()
+    }
+    
+    const currentUserLocation = profileStore.profile.location
+    const currentUserId = authStore.user?.id
+    
+    if (!currentUserLocation) {
+      error.value = 'Please set your location in your profile to find users in your area.'
+      return
+    }
+    
+    // Extract region from location (e.g., "San Francisco, CA" -> "CA" or use full location)
+    const locationParts = currentUserLocation.split(',')
+    const region = locationParts.length > 1 ? locationParts[locationParts.length - 1].trim() : currentUserLocation.trim()
+    
+    let allProfiles = []
+    
+    // Try to fetch profiles by location first
+    try {
+      const result = await ApiService.callConceptAction<any>(
+        'UserProfile',
+        '_getProfilesByLocation',
+        { location: currentUserLocation, region: region }
+      )
+      
+      // Handle different response formats
+      if (Array.isArray(result)) {
+        allProfiles = result
+      } else if (result && Array.isArray(result.profiles)) {
+        allProfiles = result.profiles
+      } else if (result && result.profiles && typeof result.profiles === 'object') {
+        // If it's an object with profile data
+        allProfiles = [result.profiles]
+      }
+    } catch (e) {
+      // If _getProfilesByLocation doesn't exist, try _getAllProfiles
+      try {
+        const result = await ApiService.callConceptAction<any>(
+          'UserProfile',
+          '_getAllProfiles',
+          {}
+        )
+        
+        if (Array.isArray(result)) {
+          allProfiles = result
+        } else if (result && Array.isArray(result.profiles)) {
+          allProfiles = result.profiles
+        }
+      } catch (e2) {
+        console.warn('Could not fetch profiles by location or all profiles:', e2)
+        error.value = 'Unable to fetch user profiles. Please try again later.'
+        return
+      }
+    }
+    
+    // Filter profiles by location/region and exclude current user
+    const profilesInArea = allProfiles.filter((profile: any) => {
+      // Exclude current user
+      if (profile._id === currentUserId || profile.userId === currentUserId) {
+        return false
+      }
+      
+      // Only include active profiles
+      if (profile.isActive === false) {
+        return false
+      }
+      
+      // Filter by location/region
+      if (!profile.location) {
+        return false
+      }
+      
+      // Match if location contains the region or matches the full location
+      const profileLocation = profile.location.toLowerCase()
+      const searchLocation = currentUserLocation.toLowerCase()
+      const searchRegion = region.toLowerCase()
+      
+      return profileLocation.includes(searchRegion) || 
+             profileLocation.includes(searchLocation) ||
+             searchLocation.includes(profileLocation.split(',')[0]?.toLowerCase() || '')
+    })
+    
+    // Resolve profile images for all profiles and normalize structure
+    const profilesWithImages = await Promise.all(
+      profilesInArea.map(async (profile: any) => {
+        const imageUrl = await resolveProfileImage(profile.profileImage || profile.profileImageFileId)
+        return {
+          ...profile,
+          _id: profile._id || profile.userId || profile.user,
+          displayname: profile.displayname || profile.name || 'Unknown User',
+          bio: profile.bio || '',
+          location: profile.location || '',
+          tags: profile.tags || {},
+          profileImage: imageUrl,
+          profileImageUrl: imageUrl
+        }
+      })
+    )
+    
+    // Filter out profiles without required fields
+    profiles.value = profilesWithImages.filter((p: any) => {
+      return p.displayname && p.displayname !== 'Unknown User' && p.isActive !== false
+    })
+  } catch (e) {
+    console.error('Error fetching users in area:', e)
+    error.value = e instanceof Error ? e.message : 'Failed to fetch users in your area.'
+  } finally {
+    loading.value = false
+  }
+}
+
+// Load users when component mounts
+onMounted(() => {
+  fetchUsersInArea()
 })
 </script>
 
@@ -176,6 +355,37 @@ const filteredProfiles = computed(() => {
   flex-wrap: wrap;
   gap: 2.5rem;
   margin-top: 2.5rem;
+}
+.loading-state {
+  text-align: center;
+  padding: 3rem;
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--color-primary-border);
+  border-top: 4px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.error-banner {
+  background: #fee;
+  color: #c33;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #fcc;
+}
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: var(--color-secondary);
+  font-size: 1.1rem;
 }
 .profile-card {
   display: flex;

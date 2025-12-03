@@ -42,6 +42,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { ApiService } from '../services/api'
 
@@ -62,6 +63,7 @@ interface MessageState {
   status: 'delivered' | 'read'
 }
 
+const route = useRoute()
 const auth = useAuthStore()
 const currentUserId = computed(() => auth.user?.id || '')
 
@@ -93,17 +95,39 @@ async function fetchUserProfile(userId: string): Promise<void> {
   if (userProfiles.value[userId]) return
   
   try {
-    const result = await ApiService.callConceptAction<{ profile?: { displayname?: string; username?: string } }>(
+    // Backend _getProfile({ user: User }) returns UserProfileDoc | { error: string }
+    // UserProfileDoc has: _id, displayname?, profileImage?, bio?, location?, emergencyContact?, tags?, isActive?
+    const result = await ApiService.callConceptAction<{
+      _id?: string
+      displayname?: string
+      profileImage?: string
+      bio?: string
+      location?: string
+      [key: string]: any
+    } | { error: string }>(
       'UserProfile',
       '_getProfile',
       { user: userId }
     )
-    if (result?.profile) {
-      userProfiles.value[userId] = result.profile
+    
+    // Check if result is an error
+    if (result && 'error' in result) {
+      console.error(`Failed to fetch profile for user ${userId}:`, result.error)
+      userProfiles.value[userId] = { username: userId }
+      return
+    }
+    
+    // Backend returns UserProfileDoc directly (not wrapped)
+    if (result && '_id' in result) {
+      userProfiles.value[userId] = {
+        displayname: result.displayname,
+        username: userId, // Use userId as fallback username
+      }
+    } else {
+      userProfiles.value[userId] = { username: userId }
     }
   } catch (e) {
     console.error(`Failed to fetch profile for user ${userId}:`, e)
-    // Fallback to userId if profile fetch fails
     userProfiles.value[userId] = { username: userId }
   }
 }
@@ -137,8 +161,14 @@ async function loadThreads() {
       await fetchUserProfile(otherUserId)
     }
 
-    // Auto-select first thread if available
-    if (threads.value.length > 0 && !selectedThreadId.value) {
+    // Check if a thread ID was passed in query params (e.g., from scheduled run page)
+    const threadParam = route.query.thread as string | undefined
+    if (threadParam && threads.value.find(t => t._id === threadParam)) {
+      // Select the thread from query params
+      selectedThreadId.value = threadParam
+      await loadMessagesForThread()
+    } else if (threads.value.length > 0 && !selectedThreadId.value) {
+      // Auto-select first thread if available and no query param
       selectedThreadId.value = threads.value[0]._id
       await loadMessagesForThread()
     }

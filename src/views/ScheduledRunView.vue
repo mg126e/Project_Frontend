@@ -60,6 +60,13 @@
 
       <div class="run-actions">
         <button 
+          @click="handleGoToMessages" 
+          class="btn-messages"
+          :disabled="loadingThread"
+        >
+          {{ loadingThread ? 'Loading...' : 'Message Partner' }}
+        </button>
+        <button 
           v-if="!run.completed" 
           @click="handleCompleteRun" 
           class="btn-complete"
@@ -88,6 +95,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useOneRunMatchingStore, type Run, type Invite } from '../stores/oneRunMatching'
 import { useAuthStore } from '../stores/auth'
+import { ApiService } from '../services/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -100,8 +108,14 @@ const run = ref<Run | null>(null)
 const invite = ref<Invite | null>(null)
 const completingRun = ref(false)
 const cancellingRun = ref(false)
+const loadingThread = ref(false)
 
 const currentUserId = computed(() => authStore.user?.id || '')
+
+const otherUserId = computed(() => {
+  if (!run.value || !currentUserId.value) return null
+  return run.value.userA === currentUserId.value ? run.value.userB : run.value.userA
+})
 
 function formatDate(dateString: string): string {
   try {
@@ -182,6 +196,37 @@ async function handleCancelRun() {
     }
   } finally {
     cancellingRun.value = false
+  }
+}
+
+async function handleGoToMessages() {
+  if (!run.value || !currentUserId.value || !otherUserId.value || loadingThread.value) return
+
+  loadingThread.value = true
+  try {
+    // Get or create the thread between the two users
+    // startChat returns existing thread if it exists, or creates a new one
+    const result = await ApiService.callConceptAction<{ thread: string } | { error: string }>(
+      'Messaging',
+      'startChat',
+      {
+        userA: currentUserId.value,
+        userB: otherUserId.value,
+      }
+    )
+
+    if ('error' in result) {
+      alert(`Failed to open chat: ${result.error}`)
+      return
+    }
+
+    // Navigate to messages page with the thread ID in query params
+    router.push(`/messages?thread=${result.thread}`)
+  } catch (e) {
+    console.error('Failed to get thread:', e)
+    alert('Failed to open chat. Please try again.')
+  } finally {
+    loadingThread.value = false
   }
 }
 
@@ -331,6 +376,7 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.btn-messages,
 .btn-complete,
 .btn-cancel {
   padding: 0.6em 1.2em;
@@ -341,6 +387,15 @@ onMounted(() => {
   transition: all 0.2s;
   border: none;
   font-family: 'Open Sans', Arial, sans-serif;
+}
+
+.btn-messages {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-messages:hover:not(:disabled) {
+  background: var(--color-primary-dark);
 }
 
 .btn-complete {
@@ -363,6 +418,7 @@ onMounted(() => {
   color: #fff;
 }
 
+.btn-messages:disabled,
 .btn-complete:disabled,
 .btn-cancel:disabled {
   opacity: 0.5;
