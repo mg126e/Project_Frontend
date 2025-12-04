@@ -8,8 +8,10 @@
       <div class="modal-body">
         <div v-if="step === 1" class="step-content">
           <label for="userSelect">Select User to Create Goal With</label>
-          <select id="userSelect" v-model="selectedUserId" class="user-select">
-            <option v-for="user in userList" :key="user.id" :value="user.id">{{ user.name }}</option>
+          <select id="userSelect" v-model="selectedUserId" class="user-select" :disabled="loadingPartners">
+            <option v-if="loadingPartners" value="">Loading partners...</option>
+            <option v-else-if="userList.length === 0" value="">No matched partners found</option>
+            <option v-else v-for="user in userList" :key="user.id" :value="user.id">{{ user.name }}</option>
           </select>
           <label for="goalDescription">Goal Description</label>
           <textarea id="goalDescription" v-model="goalDescription" placeholder="Describe your goal..." rows="4" required></textarea>
@@ -124,24 +126,55 @@ const originalStepIds = ref([]); // Track original backend step IDs to detect de
 // User selection logic
 const userList = ref([]);
 const selectedUserId = ref('');
+const loadingPartners = ref(false);
 
-// Build collaborators list ONCE when modal opens (don't react to store changes during operation)
+// Build collaborators list from matched partners
 import { onMounted } from 'vue';
-onMounted(() => {
-  const userMap = {};
-  const currentGoals = sharedGoalsStore.sharedGoals || [];
-  currentGoals.forEach(goal => {
-    (goal.users || []).forEach(u => {
-      const id = typeof u === 'object' ? u.id : u;
-      const displayname = typeof u === 'object' ? u.displayname : u;
-      if (id && id !== auth.user.id) {
-        userMap[id] = { id, name: displayname };
-      }
+import { ApiService } from '@/services/api';
+
+onMounted(async () => {
+  loadingPartners.value = true;
+  try {
+    // Get all matched partners using the new _getPartners query
+    const result = await ApiService.callConceptAction('PartnerMatching', '_getPartners', {
+      user: auth.user.id
     });
-  });
-  userList.value = Object.values(userMap).sort((a, b) => a.name.localeCompare(b.name));
-  if (userList.value.length > 0) {
-    selectedUserId.value = userList.value[0].id;
+    
+    if (result && result.partners && Array.isArray(result.partners)) {
+      // Map partners to userList format
+      userList.value = result.partners.map(partnerId => ({
+        id: partnerId,
+        name: partnerId // Fallback to ID, will be replaced by displayname if available
+      }));
+      
+      // Fetch displaynames for each partner from UserProfile
+      for (const user of userList.value) {
+        try {
+          const profileResult = await ApiService.callConceptAction('UserProfile', '_getProfile', {
+            user: user.id
+          });
+          if (profileResult && profileResult.profile && profileResult.profile.displayname) {
+            user.name = profileResult.profile.displayname;
+          }
+        } catch (e) {
+          console.warn('[GoalCreationModal] Could not fetch profile for partner:', user.id);
+        }
+      }
+      
+      // Sort by name
+      userList.value.sort((a, b) => a.name.localeCompare(b.name));
+      
+      // Select first partner by default
+      if (userList.value.length > 0) {
+        selectedUserId.value = userList.value[0].id;
+      }
+    } else if (result && result.error) {
+      console.error('[GoalCreationModal] Error fetching partners:', result.error);
+    }
+  } catch (e) {
+    console.error('[GoalCreationModal] Failed to fetch partners:', e);
+  } finally {
+    loadingPartners.value = false;
   }
 });
 

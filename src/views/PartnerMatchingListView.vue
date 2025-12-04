@@ -342,7 +342,7 @@ onMounted(() => {
   min-width: 140px;
 }
 .filter-dropdown:focus {
-  border-color: #106cb8;
+  border-color: var(--color-primary-dark);
 }
 .partner-matching-page {
   min-width: 800px;
@@ -351,8 +351,8 @@ onMounted(() => {
   padding: 3.5rem 4.5rem 3.5rem 4.5rem;
 }
 .profiles-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 2.5rem;
   margin-top: 2.5rem;
 }

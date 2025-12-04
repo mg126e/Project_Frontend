@@ -3,20 +3,29 @@
     <span class="spinner"></span>
   </div>
   <div v-else class="dashboard-home">
-    <h1>Welcome{{ displayName ? `, ${displayName}` : '' }}!</h1>
+    <h1>{{ greeting }}{{ displayName ? `, ${displayName}` : '' }}!</h1>
     <p class="dashboard-welcome-msg">Check out your important stats!</p>
     <div class="dashboard-stats">
       <div class="stat-card">
         <div class="stat-label">Total Goals</div>
         <div class="stat-value">{{ stats.goals }}</div>
+        <div v-if="stats.goals === 0" class="stat-hint">
+          <router-link to="/goals" class="stat-cta">Create your first goal</router-link>
+        </div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Milestones</div>
         <div class="stat-value">{{ stats.milestones }}</div>
+        <div v-if="stats.milestones === 0" class="stat-hint">
+          <router-link to="/milestones" class="stat-cta">Create your first milestone</router-link>
+        </div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Matches</div>
         <div class="stat-value">{{ stats.matches }}</div>
+        <div v-if="stats.matches === 0" class="stat-hint">
+          <router-link to="/matches" class="stat-cta">Find a running partner</router-link>
+        </div>
       </div>
     </div>
 
@@ -68,6 +77,12 @@ const displayName = computed(() => {
   return profile?.displayname?.trim() || auth.user?.username || '';
 });
 
+const greeting = computed(() => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+});
 
 const stats = ref({
   goals: 0,
@@ -91,7 +106,7 @@ function markInviteAsHandled(id: string) {
 }
 
 // All available invites (TODO: Replace with real API call)
-const allInvites = [
+const allInvites: Array<{ id: string; from: string; message: string; profile: any }> = [
   // Invites will be populated from API
 ];
 
@@ -104,7 +119,7 @@ const pendingInvites = ref(
 const showProfileModal = ref(false);
 const modalProfile = ref(null);
 
-function openProfileModal(profile) {
+function openProfileModal(profile: any) {
   modalProfile.value = profile;
   showProfileModal.value = true;
 }
@@ -113,7 +128,7 @@ function closeProfileModal() {
   modalProfile.value = null;
 }
 
-async function acceptInvite(id) {
+async function acceptInvite(id: string) {
   // TODO: Replace with real API call
   markInviteAsHandled(id);
   pendingInvites.value = pendingInvites.value.filter(invite => invite.id !== id);
@@ -123,7 +138,7 @@ async function acceptInvite(id) {
   router.push('/messages');
 }
 
-function declineInvite(id) {
+function declineInvite(id: string) {
   // TODO: Replace with real API call
   markInviteAsHandled(id);
   pendingInvites.value = pendingInvites.value.filter(invite => invite.id !== id);
@@ -138,7 +153,7 @@ async function fetchMatches() {
 
   try {
     // Use the correct endpoint: _getMatches from OneRunMatching concept
-    const result = await ApiService.callConceptAction<Array<{ _id: string; userA: string; userB: string; completed: boolean }>>(
+    const result = await ApiService.callConceptAction<any>(
       'OneRunMatching',
       '_getMatches',
       { user: auth.user.id }
@@ -157,35 +172,23 @@ async function fetchMatches() {
     stats.value.matches = activeMatches.length;
   } catch (e: any) {
     console.warn('Failed to fetch matches from API:', e?.message || e);
-    // Fallback to profile matches if API call fails
-    const profile = profileStore.profile;
-    stats.value.matches = profile?.matches?.length || 0;
-    // Don't show error to user, just use fallback
+    // Set to 0 if API call fails
+    stats.value.matches = 0;
   }
 }
 
 onMounted(async () => {
   await profileStore.fetchProfile();
-  await sharedGoalsStore.fetchAllSharedGoalsForUser(auth.user.id);
+  await sharedGoalsStore.fetchAllSharedGoalsForUser();
   await fetchMatches();
   
-  const profile = profileStore.profile;
   stats.value.goals = sharedGoalsStore.sharedGoals.length;
-  stats.value.milestones = profile?.milestones?.length || 0;
-  stats.value.messages = profile?.messages?.length || 0;
+  stats.value.milestones = 0; // TODO: Implement milestones tracking
+  stats.value.messages = 0; // TODO: Implement messages tracking
 });
 </script>
 
 <style scoped>
-.dashboard-home {
-  max-width: 700px;
-  margin: 2.5rem auto;
-  background: #F9FAFB;
-  border-radius: 16px;
-  padding: 2.5rem 3.5rem 2.2rem 3.5rem;
-  text-align: center;
-}
-
 .pending-invites-section {
   margin-top: 2.5rem;
   background: #f7fafd;
@@ -259,45 +262,62 @@ onMounted(async () => {
   color: #fff;
 }
 .dashboard-home {
-  max-width: 700px;
+  max-width: 900px;
   margin: 2.5rem auto;
   background: #F9FAFB;
   border-radius: 16px;
-  padding: 2.5rem 3.5rem 2.2rem 3.5rem;
+  padding: 3rem 4.5rem 3rem 4.5rem;
   text-align: center;
 }
 .dashboard-home h1 {
   color: var(--color-primary);
-  font-size: 2.2rem;
-  margin-bottom: 1.2rem;
+  font-size: 2.4rem;
+  margin-bottom: 1.5rem;
 }
 .dashboard-welcome-msg {
   color: #555;
-  font-size: 1.15rem;
-  margin-bottom: 2.2rem;
+  font-size: 1.35rem;
+  margin-bottom: 2.5rem;
 }
 .dashboard-stats {
   display: flex;
   justify-content: center;
-  gap: 2.2rem;
-  margin-bottom: 2.5rem;
+  gap: 2.8rem;
+  margin-bottom: 3rem;
   flex-wrap: wrap;
 }
 .stat-card {
   background: #f7fafd;
-  border-radius: 10px;
-  padding: 1.2rem 2.2rem;
-  min-width: 120px;
+  border-radius: 12px;
+  padding: 1.4rem 3rem;
+  min-width: 160px;
 }
 .stat-label {
   color: var(--color-primary);
   font-weight: 600;
-  margin-bottom: 0.5em;
+  font-size: 1.1rem;
+  margin-bottom: 0.6em;
 }
 .stat-value {
-  font-size: 1.7rem;
+  font-size: 2.5rem;
   font-weight: 700;
   color: #222;
+}
+.stat-hint {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  color: #666;
+  font-style: italic;
+}
+.stat-cta {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 600;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+.stat-cta:hover {
+  background: #fff1e2;
 }
 
 .dashboard-spinner {

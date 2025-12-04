@@ -400,13 +400,6 @@ export const useProfileStore = defineStore('profile', () => {
       if (newUserId && newUserId !== oldUserId) {
         fetchProfile();
       }
-      if (!newUserId) {
-        // Optionally clear profile on logout, but keep the reference
-        for (const key of Object.keys(defaultProfile)) {
-          // @ts-ignore
-          profile.value[key] = defaultProfile[key];
-        }
-      }
     }
   );
 

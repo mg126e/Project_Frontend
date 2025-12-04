@@ -92,8 +92,11 @@
         </div>
       </div>
       <div style="display: flex; gap: 1rem; margin-top: 1.2rem;">
-        <button class="btn-primary" type="submit">Save Profile</button>
-        <button class="btn-link" type="button" @click="cancelEdit">Cancel</button>
+        <button class="btn-primary" type="submit" :disabled="savingProfile">
+          <span v-if="savingProfile" class="button-spinner"></span>
+          <span v-else>Save Profile</span>
+        </button>
+        <button v-if="!savingProfile" class="btn-link" type="button" @click="cancelEdit">Cancel</button>
       </div>
       </form>
 
@@ -181,6 +184,7 @@ const loadingProfile = ref(true);
 const locationError = ref(false);
 const paceInputError = ref(false);
 const isEditMode = ref(false);
+const savingProfile = ref(false);
 
 // Local edit form for editing profile - MUST be declared before watchers/computed that use it
 const editForm = ref({
@@ -451,6 +455,7 @@ async function saveProfile() {
     tags: { ...tagsWithoutGenderOther, gender: genderValue },
     profileImage: p.profileImage
   };
+  savingProfile.value = true;
   try {
     await profileStore.batchUpdateProfile(payload);
     // Re-fetch profile to update profileImage and all fields
@@ -458,6 +463,8 @@ async function saveProfile() {
     isEditMode.value = false;
   } catch (e) {
     alert('Failed to save profile.');
+  } finally {
+    savingProfile.value = false;
   }
 }
 
@@ -770,5 +777,22 @@ function onPasswordChanged(msg) {
   color: var(--color-success);
   margin-top: 0.7rem;
   text-align: center;
+}
+.button-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>
