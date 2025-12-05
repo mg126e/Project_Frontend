@@ -152,7 +152,6 @@ import { useOneRunMatchingStore, type Invite } from '../stores/oneRunMatching'
 import { useProfileStore } from '../stores/profile'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
-import ConfirmActionModal from '../components/ConfirmActionModal.vue'
 
 const router = useRouter()
 const oneRunStore = useOneRunMatchingStore()
@@ -332,15 +331,15 @@ async function loadData() {
       const location = profileStore.profile.location
       // For now, use the full location as region, or extract state
       const parts = location.split(',')
-      newInvite.value.region = parts.length > 1 ? parts[parts.length - 1].trim() : location.trim()
+      newInvite.value.region = parts.length > 1 ? parts[parts.length - 1]?.trim() || location.trim() : location.trim()
     }
 
     // Load invites and runs
     const region = newInvite.value.region || (profileStore.profile.location ? 
       (() => {
-        const location = profileStore.profile.location
+        const location = profileStore.profile.location || ''
         const parts = location.split(',')
-        return parts.length > 1 ? parts[parts.length - 1].trim() : location.trim()
+        return parts.length > 1 ? parts[parts.length - 1]?.trim() || location.trim() : location.trim()
       })() : undefined)
     
     await Promise.all([
@@ -359,7 +358,7 @@ onMounted(() => {
 
 <style scoped>
 .run-buddy-finder {
-  max-width: 900px;
+  width: 900px;
   margin: 2rem auto;
   background: #F9FAFB;
   border-radius: 24px;
@@ -563,21 +562,16 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.2s;
   border: none;
-  font-family: 'Open Sans', Arial, sans-serif;
 }
 
 .btn-primary {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-accent);
   backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: var(--color-primary);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.4);
-  outline: 2px solid var(--color-accent);
+  background: var(--color-accent-dark);
   outline-offset: 2px;
 }
 

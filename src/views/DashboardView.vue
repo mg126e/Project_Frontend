@@ -6,14 +6,14 @@
     <h1>{{ greeting }}{{ displayName ? `, ${displayName}` : '' }}!</h1>
     <p class="dashboard-welcome-msg">Check out your important stats!</p>
     <div class="dashboard-stats">
-      <div class="stat-card">
+      <div v-if="stats.matches > 0" class="stat-card">
         <div class="stat-label">Total Goals</div>
         <div class="stat-value">{{ stats.goals }}</div>
         <div v-if="stats.goals === 0" class="stat-hint">
           <router-link to="/goals" class="stat-cta">Create your first goal</router-link>
         </div>
       </div>
-      <div class="stat-card">
+      <div v-if="stats.matches > 0" class="stat-card">
         <div class="stat-label">Milestones</div>
         <div class="stat-value">{{ stats.milestones }}</div>
         <div v-if="stats.milestones === 0" class="stat-hint">
