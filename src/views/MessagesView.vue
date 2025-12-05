@@ -88,6 +88,9 @@ function getOtherUserName(thread: ThreadState | null): string {
   if (!thread) return 'Unknown'
   const otherUserId = thread.userA === currentUserId.value ? thread.userB : thread.userA
   const profile = userProfiles.value[otherUserId]
+  if (profile?.displayname && profile?.username) {
+    return `${profile.displayname} (${profile.username})`
+  }
   return profile?.displayname || profile?.username || `User ${otherUserId.slice(0, 8)}`
 }
 
@@ -95,37 +98,31 @@ async function fetchUserProfile(userId: string): Promise<void> {
   if (userProfiles.value[userId]) return
   
   try {
-    // Backend _getProfile({ user: User }) returns UserProfileDoc | { error: string }
-    // UserProfileDoc has: _id, displayname?, profileImage?, bio?, location?, emergencyContact?, tags?, isActive?
-    const result = await ApiService.callConceptAction<{
-      _id?: string
-      displayname?: string
-      profileImage?: string
-      bio?: string
-      location?: string
-      [key: string]: any
-    } | { error: string }>(
-      'UserProfile',
-      '_getProfile',
-      { user: userId }
-    )
-    
-    // Check if result is an error
-    if (result && 'error' in result) {
-      console.error(`Failed to fetch profile for user ${userId}:`, result.error)
-      userProfiles.value[userId] = { username: userId }
-      return
-    }
-    
-    // Backend returns UserProfileDoc directly (not wrapped)
-    if (result && '_id' in result) {
-      userProfiles.value[userId] = {
-        displayname: result.displayname,
-        username: userId, // Use userId as fallback username
+    // Fetch both displayname and username
+    const results = await Promise.allSettled([
+      ApiService.callConceptAction<{ displayname: string } | { error: string }>('UserProfile', '_getDisplayName', { user: userId }),
+      ApiService.callConceptAction<{ username: string } | { error: string }>('PasswordAuthentication', '_getUsername', { user: userId })
+    ])
+
+    const profile: { displayname?: string; username?: string } = {}
+
+    // Handle displayname result
+    if (results[0].status === 'fulfilled') {
+      const result = results[0].value
+      if (!('error' in result)) {
+        profile.displayname = result.displayname
       }
-    } else {
-      userProfiles.value[userId] = { username: userId }
     }
+
+    // Handle username result
+    if (results[1].status === 'fulfilled') {
+      const result = results[1].value
+      if (!('error' in result)) {
+        profile.username = result.username
+      }
+    }
+
+    userProfiles.value[userId] = profile
   } catch (e) {
     console.error(`Failed to fetch profile for user ${userId}:`, e)
     userProfiles.value[userId] = { username: userId }
@@ -169,8 +166,11 @@ async function loadThreads() {
       await loadMessagesForThread()
     } else if (threads.value.length > 0 && !selectedThreadId.value) {
       // Auto-select first thread if available and no query param
-      selectedThreadId.value = threads.value[0]._id
-      await loadMessagesForThread()
+      const firstThread = threads.value[0]
+      if (firstThread) {
+        selectedThreadId.value = firstThread._id
+        await loadMessagesForThread()
+      }
     }
   } catch (e: any) {
     console.error('Failed to load threads:', e)
@@ -197,8 +197,9 @@ async function loadMessagesForThread() {
     
     if (Array.isArray(result)) {
       // Check if it's an error array
-      if (result.length > 0 && 'error' in result[0]) {
-        messagesError.value = (result[0] as { error: string }).error
+      const firstItem = result[0]
+      if (result.length > 0 && firstItem && 'error' in firstItem) {
+        messagesError.value = (firstItem as { error: string }).error
         messages.value = []
       } else {
         messages.value = result as MessageState[]

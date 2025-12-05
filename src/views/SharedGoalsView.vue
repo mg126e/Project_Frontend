@@ -76,9 +76,11 @@
 import GoalCreationModal from '../components/GoalCreationModal.vue';
 import { useSharedGoalsStore } from '../stores/sharedGoals';
 import { useAuthStore } from '../stores/auth';
+import { useOneRunMatchingStore } from '../stores/oneRunMatching';
 import { storeToRefs } from 'pinia';
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { format } from 'date-fns';
+import { ApiService } from '../services/api';
 
 function formatDate(date) {
   if (!date) return '';
@@ -97,6 +99,7 @@ function getStepCount(goal) {
 }
 
 const sharedGoalsStore = useSharedGoalsStore();
+const oneRunStore = useOneRunMatchingStore();
 const { sharedGoals, loading, error } = storeToRefs(sharedGoalsStore);
 const auth = useAuthStore();
 const statusFilter = ref('all'); // 'all' | 'active' | 'inactive'
@@ -104,6 +107,7 @@ const userFilter = ref('all'); // 'all' | specific user ID
 const sortBy = ref('newest'); // 'newest' | 'oldest' | 'most-steps' | 'least-steps' | 'recently-closed'
 const showGoalModal = ref(false);
 const savingGoal = ref(false);
+const matchedUsers = ref([]); // Users from PartnerMatching and OneRunMatching
 
 // Watch for unexpected changes to showGoalModal
 watch(() => showGoalModal.value, (newVal, oldVal) => {
@@ -112,19 +116,9 @@ watch(() => showGoalModal.value, (newVal, oldVal) => {
   }
 });
 
-// Get all unique users from all goals
+// Get all unique users - now from matched users instead of goals
 const allUsers = computed(() => {
-  const userMap = {};
-  sharedGoals.value.forEach(goal => {
-    (goal.users || []).forEach(u => {
-      const id = typeof u === 'object' ? u.id : u;
-      const displayname = typeof u === 'object' ? u.displayname : u;
-      if (id && id !== auth.user.id && !userMap[id]) {
-        userMap[id] = { id, displayname };
-      }
-    });
-  });
-  return Object.values(userMap).sort((a, b) => a.displayname.localeCompare(b.displayname));
+  return matchedUsers.value.sort((a, b) => a.displayname.localeCompare(b.displayname));
 });
 
 const filteredGoals = computed(() => {
@@ -251,9 +245,61 @@ function toggleUser(userId) {
   openUsers[userId] = !openUsers[userId];
 }
 
+// Fetch all matched users from PartnerMatching and OneRunMatching
+async function fetchMatchedUsers() {
+  const userMap = {};
+  
+  try {
+    // 1. Fetch long-term partners from PartnerMatching
+    const partnersResult = await ApiService.callConceptAction('PartnerMatching', '_getPartners', {
+      user: auth.user.id
+    });
+    
+    if (partnersResult && partnersResult.partners && Array.isArray(partnersResult.partners)) {
+      for (const partnerId of partnersResult.partners) {
+        if (partnerId !== auth.user.id && !userMap[partnerId]) {
+          userMap[partnerId] = { id: partnerId, displayname: partnerId };
+        }
+      }
+    }
+    
+    // 2. Fetch users from OneRunMatching runs
+    await oneRunStore.fetchMatches();
+    if (oneRunStore.runs && Array.isArray(oneRunStore.runs)) {
+      for (const run of oneRunStore.runs) {
+        const otherUserId = run.userA === auth.user.id ? run.userB : run.userA;
+        if (otherUserId && otherUserId !== auth.user.id && !userMap[otherUserId]) {
+          userMap[otherUserId] = { id: otherUserId, displayname: otherUserId };
+        }
+      }
+    }
+    
+    // 3. Fetch displaynames for all users
+    const userIds = Object.keys(userMap);
+    for (const userId of userIds) {
+      try {
+        const result = await ApiService.callConceptAction('UserProfile', '_getDisplayName', {
+          user: userId
+        });
+        if (result && !('error' in result) && result.displayname) {
+          userMap[userId].displayname = result.displayname;
+        }
+      } catch (e) {
+        console.warn('[SharedGoalsView] Could not fetch displayname for user:', userId);
+      }
+    }
+    
+    matchedUsers.value = Object.values(userMap);
+  } catch (e) {
+    console.error('[SharedGoalsView] Failed to fetch matched users:', e);
+  }
+}
 
 onMounted(async () => {
-  await sharedGoalsStore.fetchAllSharedGoalsForUser(auth.user.id);
+  await Promise.all([
+    sharedGoalsStore.fetchAllSharedGoalsForUser(auth.user.id),
+    fetchMatchedUsers()
+  ]);
   // Fetch steps for all goals after goals are loaded
   await fetchAllSteps();
 });

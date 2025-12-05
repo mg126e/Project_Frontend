@@ -131,45 +131,73 @@ const loadingPartners = ref(false);
 // Build collaborators list from matched partners
 import { onMounted } from 'vue';
 import { ApiService } from '@/services/api';
+import { useOneRunMatchingStore } from '../stores/oneRunMatching';
 
 onMounted(async () => {
   loadingPartners.value = true;
+  const userMap = {};
+  
   try {
-    // Get all matched partners using the new _getPartners query
-    const result = await ApiService.callConceptAction('PartnerMatching', '_getPartners', {
+    // 1. Get long-term partners from PartnerMatching
+    const partnersResult = await ApiService.callConceptAction('PartnerMatching', '_getPartners', {
       user: auth.user.id
     });
     
-    if (result && result.partners && Array.isArray(result.partners)) {
-      // Map partners to userList format
-      userList.value = result.partners.map(partnerId => ({
-        id: partnerId,
-        name: partnerId // Fallback to ID, will be replaced by displayname if available
-      }));
-      
-      // Fetch displaynames for each partner from UserProfile
-      for (const user of userList.value) {
-        try {
-          const profileResult = await ApiService.callConceptAction('UserProfile', '_getProfile', {
-            user: user.id
-          });
-          if (profileResult && profileResult.profile && profileResult.profile.displayname) {
-            user.name = profileResult.profile.displayname;
-          }
-        } catch (e) {
-          console.warn('[GoalCreationModal] Could not fetch profile for partner:', user.id);
+    if (partnersResult && partnersResult.partners && Array.isArray(partnersResult.partners)) {
+      for (const partnerId of partnersResult.partners) {
+        if (partnerId !== auth.user.id && !userMap[partnerId]) {
+          userMap[partnerId] = { id: partnerId, name: partnerId };
         }
       }
-      
-      // Sort by name
-      userList.value.sort((a, b) => a.name.localeCompare(b.name));
-      
-      // Select first partner by default
-      if (userList.value.length > 0) {
-        selectedUserId.value = userList.value[0].id;
+    }
+    
+    // 2. Get one-time run partners from OneRunMatching
+    const oneRunStore = useOneRunMatchingStore();
+    await oneRunStore.fetchMatches();
+    
+    if (oneRunStore.runs && Array.isArray(oneRunStore.runs)) {
+      for (const run of oneRunStore.runs) {
+        const otherUserId = run.userA === auth.user.id ? run.userB : run.userA;
+        if (otherUserId && otherUserId !== auth.user.id && !userMap[otherUserId]) {
+          userMap[otherUserId] = { id: otherUserId, name: otherUserId };
+        }
       }
-    } else if (result && result.error) {
-      console.error('[GoalCreationModal] Error fetching partners:', result.error);
+    }
+    
+    // 3. Fetch displaynames and usernames for all users
+    const userIds = Object.keys(userMap);
+    for (const userId of userIds) {
+      try {
+        // Fetch both displayname and username in parallel
+        const [displaynameResult, usernameResult] = await Promise.allSettled([
+          ApiService.callConceptAction('UserProfile', '_getDisplayName', { user: userId }),
+          ApiService.callConceptAction('PasswordAuthentication', '_getUsername', { user: userId })
+        ]);
+        
+        let displayname = userId;
+        let username = '';
+        
+        if (displaynameResult.status === 'fulfilled' && displaynameResult.value && !('error' in displaynameResult.value)) {
+          displayname = displaynameResult.value.displayname;
+        }
+        
+        if (usernameResult.status === 'fulfilled' && usernameResult.value && !('error' in usernameResult.value)) {
+          username = usernameResult.value.username;
+        }
+        
+        // Format as "DisplayName (username)" or just "DisplayName" if no username
+        userMap[userId].name = username ? `${displayname} (${username})` : displayname;
+      } catch (e) {
+        console.warn('[GoalCreationModal] Could not fetch user info for:', userId);
+      }
+    }
+    
+    // Convert to array and sort
+    userList.value = Object.values(userMap).sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Select first partner by default
+    if (userList.value.length > 0) {
+      selectedUserId.value = userList.value[0].id;
     }
   } catch (e) {
     console.error('[GoalCreationModal] Failed to fetch partners:', e);
@@ -230,7 +258,7 @@ async function regenerateSteps() {
   generating.value = true;
   steps.value = [];
   try {
-    const genResult = await sharedGoalsStore.regenerateSharedSteps({ sharedGoal: goalId, user: auth.user.id });
+    const genResult = await sharedGoalsStore.regenerateSharedSteps({ sharedGoal: goalId });
     
     // Check for errors first
     if (genResult && genResult.error) {
@@ -273,15 +301,35 @@ async function chooseMethod(selected) {
       const users = [auth.user.id, selectedUserId.value];
       let goalId = goalIdRef.value;
       if (!goalId) {
-        const goalResult = await sharedGoalsStore.createSharedGoal({ users, description: goalDescription.value });
-        goalId = goalResult?.sharedGoalId || goalResult?.goalId || goalResult?.id || goalResult;
-        goalIdRef.value = goalId;
+        try {
+          const goalResult = await sharedGoalsStore.createSharedGoal({ users, description: goalDescription.value });
+          console.log('[GoalCreationModal] createSharedGoal result:', goalResult);
+          // Check if createSharedGoal returned a valid goal ID
+          if (!goalResult || typeof goalResult !== 'string') {
+            console.error('[GoalCreationModal] Invalid goal result:', goalResult);
+            generationError.value = 'Failed to create goal. Please try again.';
+            generating.value = false;
+            return;
+          }
+          goalId = goalResult;
+          goalIdRef.value = goalId;
+          console.log('[GoalCreationModal] Goal created with ID:', goalId);
+        } catch (createError) {
+          // Handle the error from createSharedGoal
+          console.error('[GoalCreationModal] Error creating goal:', createError);
+          generationError.value = createError instanceof Error ? createError.message : 'Failed to create goal.';
+          generating.value = false;
+          return;
+        }
       }
       // 2. Generate steps using backend - returns { steps: [...], error: '...' }
-      const genResult = await sharedGoalsStore.generateSharedSteps({ sharedGoal: goalId, user: auth.user.id });
+      console.log('[GoalCreationModal] Calling generateSharedSteps with goalId:', goalId);
+      const genResult = await sharedGoalsStore.generateSharedSteps({ sharedGoal: goalId });
+      console.log('[GoalCreationModal] generateSharedSteps result:', genResult);
       
       // Check for errors first
       if (genResult && genResult.error) {
+        console.error('[GoalCreationModal] Error generating steps:', genResult.error);
         generationError.value = genResult.error;
         generating.value = false;
         step.value = 2; // Still go to step 2 so user can see error and regenerate
@@ -328,7 +376,13 @@ async function saveGoal() {
     if (!goalId) {
       const users = [auth.user.id, selectedUserId.value];
       const goalResult = await sharedGoalsStore.createSharedGoal({ users, description: goalDescription.value });
-      goalId = goalResult?.sharedGoalId || goalResult?.goalId || goalResult?.id || goalResult;
+      // Check if createSharedGoal returned an error
+      if (!goalResult || typeof goalResult !== 'string') {
+        generationError.value = 'Failed to create goal. Please try again.';
+        saving.value = false;
+        return;
+      }
+      goalId = goalResult;
       goalIdRef.value = goalId;
     }
     

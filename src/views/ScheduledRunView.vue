@@ -47,12 +47,12 @@
         <div class="partners-list">
           <div class="partner-item">
             <span class="partner-label">Partner 1:</span>
-            <span class="partner-id">{{ run.userA }}</span>
+            <span class="partner-name">{{ userAName }}<span v-if="userAUsername" class="partner-username"> ({{ userAUsername }})</span></span>
             <span v-if="run.userA === currentUserId" class="partner-badge">(You)</span>
           </div>
           <div class="partner-item">
             <span class="partner-label">Partner 2:</span>
-            <span class="partner-id">{{ run.userB }}</span>
+            <span class="partner-name">{{ userBName }}<span v-if="userBUsername" class="partner-username"> ({{ userBUsername }})</span></span>
             <span v-if="run.userB === currentUserId" class="partner-badge">(You)</span>
           </div>
         </div>
@@ -109,6 +109,10 @@ const invite = ref<Invite | null>(null)
 const completingRun = ref(false)
 const cancellingRun = ref(false)
 const loadingThread = ref(false)
+const userAName = ref('Loading...')
+const userBName = ref('Loading...')
+const userAUsername = ref('')
+const userBUsername = ref('')
 
 const currentUserId = computed(() => authStore.user?.id || '')
 
@@ -154,10 +158,73 @@ async function loadRunData() {
     // Find the associated invite
     const associatedInvite = await oneRunStore.findInviteForRun(fetchedRun)
     invite.value = associatedInvite
+
+    // Fetch display names for both users
+    await fetchUserNames(fetchedRun.userA, fetchedRun.userB)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to load run details'
   } finally {
     loading.value = false
+  }
+}
+
+async function fetchUserNames(userAId: string, userBId: string) {
+  try {
+    // Fetch both displayname and username for each user
+    const results = await Promise.allSettled([
+      ApiService.callConceptAction<{ displayname: string } | { error: string }>('UserProfile', '_getDisplayName', { user: userAId }),
+      ApiService.callConceptAction<{ displayname: string } | { error: string }>('UserProfile', '_getDisplayName', { user: userBId }),
+      ApiService.callConceptAction<{ username: string } | { error: string }>('PasswordAuthentication', '_getUsername', { user: userAId }),
+      ApiService.callConceptAction<{ username: string } | { error: string }>('PasswordAuthentication', '_getUsername', { user: userBId })
+    ])
+
+    // Handle userA displayname
+    if (results[0].status === 'fulfilled') {
+      const result = results[0].value
+      if ('error' in result) {
+        console.warn('Failed to get display name for user A:', result.error)
+        userAName.value = userAId
+      } else {
+        userAName.value = result.displayname
+      }
+    } else {
+      console.error('Failed to fetch display name for user A:', results[0].reason)
+      userAName.value = userAId
+    }
+
+    // Handle userB displayname
+    if (results[1].status === 'fulfilled') {
+      const result = results[1].value
+      if ('error' in result) {
+        console.warn('Failed to get display name for user B:', result.error)
+        userBName.value = userBId
+      } else {
+        userBName.value = result.displayname
+      }
+    } else {
+      console.error('Failed to fetch display name for user B:', results[1].reason)
+      userBName.value = userBId
+    }
+
+    // Handle userA username
+    if (results[2].status === 'fulfilled') {
+      const result = results[2].value
+      if (!('error' in result)) {
+        userAUsername.value = result.username
+      }
+    }
+
+    // Handle userB username
+    if (results[3].status === 'fulfilled') {
+      const result = results[3].value
+      if (!('error' in result)) {
+        userBUsername.value = result.username
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch user names:', e)
+    userAName.value = userAId
+    userBName.value = userBId
   }
 }
 
@@ -355,9 +422,15 @@ onMounted(() => {
   color: var(--color-primary);
 }
 
-.partner-id {
+.partner-name {
   color: var(--color-secondary);
-  font-family: monospace;
+  font-size: 1.1rem;
+}
+
+.partner-username {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  font-weight: 400;
 }
 
 .partner-badge {
