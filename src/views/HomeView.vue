@@ -6,7 +6,7 @@
       </div>
       <h1 class="home-headline">Find Your Running Crew</h1>
       <p class="home-subtitle">
-        The running app built <span class="highlight">by and for college students</span>.<br>
+        The running app built <span class="highlight">by and for college students in the Boston area</span>.<br>
         Meet new people, crush your goals, and make memories one run at a time.
       </p>
       <div class="home-actions">

@@ -29,8 +29,15 @@ apiClient.interceptors.request.use(
       const session = getFromStorage('session', null)
       
       if (session) {
-        // ✅ Add session to Authorization header (preferred method)
+        // Add session to both Authorization header AND request body
         config.headers.Authorization = `Bearer ${session}`
+        
+        // Also add to request body for backend syncs that expect it there
+        if (config.data && typeof config.data === 'object') {
+          config.data = { ...config.data, session }
+        } else {
+          config.data = { session }
+        }
       }
     }
     return config

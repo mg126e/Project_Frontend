@@ -102,18 +102,6 @@ const router = createRouter({
 			],
 		},
 		{
-			path: '/match/:id',
-			component: () => import('../components/DashboardLayout.vue'),
-			meta: { requiresAuth: true },
-			children: [
-				{
-					path: '',
-					name: 'match-detail',
-					component: () => import('../views/MatchDetailView.vue'),
-				},
-			],
-		},
-		{
 			path: '/goals',
 			component: () => import('../components/DashboardLayout.vue'),
 			meta: { requiresAuth: true },
