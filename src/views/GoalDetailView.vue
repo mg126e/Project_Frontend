@@ -151,11 +151,14 @@ async function completeStep(stepId) {
     user: auth.user.id,
     sharedGoal: goal.value.id
   });
-  // Update local state for immediate UI feedback
-  const stepIdx = steps.value.findIndex(s => s.id === stepId);
-  if (stepIdx !== -1) {
-    steps.value[stepIdx].completion = new Date().toISOString();
+  // Reload the goal to get updated state (in case it was auto-closed)
+  const updatedGoal = await sharedGoalsStore.fetchSharedGoalById([auth.user.id, ...goal.value.users.filter(id => id !== auth.user.id)], goal.value.id);
+  if (updatedGoal) {
+    goal.value = updatedGoal;
   }
+  // Reload steps
+  await sharedGoalsStore.fetchSharedSteps(goal.value.id);
+  steps.value = Array.isArray(sharedGoalsStore.steps) ? sharedGoalsStore.steps : [];
 }
 
 async function markGoalComplete() {

@@ -28,70 +28,139 @@ const router = createRouter({
 			path: '/dashboard',
 			component: () => import('../components/DashboardLayout.vue'),
 			meta: { requiresAuth: true },
-			redirect: '/dashboard/home',
 			children: [
 				{
-					path: 'home',
+					path: '',
 					name: 'dashboard-home',
 					component: () => import('../views/DashboardView.vue'),
 				},
+			],
+		},
+		{
+			path: '/profile',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
+			children: [
 				{
-					path: 'profile',
+					path: '',
 					name: 'profile',
 					component: () => import('../views/UserProfileView.vue'),
 				},
+			],
+		},
+		{
+			path: '/find-buddy',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
+			children: [
 				{
-					path: 'find-buddy',
+					path: '',
 					name: 'run-buddy-finder',
 					component: () => import('../views/RunBuddyFinderView.vue'),
 				},
+			],
+		},
+		{
+			path: '/invite/:id',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
+			children: [
 				{
-					path: 'invite/:id',
+					path: '',
 					name: 'run-invite',
 					component: () => import('../views/RunInviteView.vue'),
 				},
+			],
+		},
+		{
+			path: '/run/:id',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
+			children: [
 				{
-					path: 'run/:id',
+					path: '',
 					name: 'scheduled-run',
 					component: () => import('../views/ScheduledRunView.vue'),
 				},
+			],
+		},
+		{
+			path: '/matches',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
+			children: [
 				{
-					path: 'matches',
+					path: '',
 					name: 'partner-matching',
 					component: () => import('../views/PartnerMatchingView.vue'),
 				},
 				{
-					path: 'matches/partner',
+					path: 'partner',
 					name: 'partner-matching-list',
 					component: () => import('../views/PartnerMatchingListView.vue'),
 				},
+			],
+		},
+		{
+			path: '/match/:id',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
+			children: [
 				{
-					path: 'match/:id',
+					path: '',
 					name: 'match-detail',
 					component: () => import('../views/MatchDetailView.vue'),
 				},
+			],
+		},
+		{
+			path: '/goals',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
+			children: [
 				{
-					path: 'goals',
+					path: '',
 					name: 'shared-goals',
 					component: () => import('../views/SharedGoalsView.vue'),
 				},
 				{
-					path: 'goals/:id',
+					path: ':id',
 					name: 'goal-detail',
 					component: () => import('../views/GoalDetailView.vue'),
 				},
+			],
+		},
+		{
+			path: '/milestones',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
+			children: [
 				{
-					path: 'milestones',
+					path: '',
 					name: 'milestone-map',
 					component: () => import('../views/MilestoneMapView.vue'),
 				},
+			],
+		},
+		{
+			path: '/messages',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
+			children: [
 				{
-					path: 'messages',
+					path: '',
 					name: 'messages',
 					component: () => import('../views/MessagesView.vue'),
 				},
+			],
+		},
+		{
+			path: '/chat/:id',
+			component: () => import('../components/DashboardLayout.vue'),
+			meta: { requiresAuth: true },
+			children: [
 				{
-					path: 'chat/:id',
+					path: '',
 					name: 'chat',
 					component: () => import('../views/ChatView.vue'),
 				},

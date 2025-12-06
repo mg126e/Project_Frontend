@@ -44,8 +44,10 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
         if (!session) throw new Error('Session not found');
         // Call the new backend method (update backend to support this!)
         const response = await ApiService.callConceptAction<any>('SharedGoals', '_getAllGoalsForUser', { session });
-        this.sharedGoals = Array.isArray(response)
-          ? response.map((g: any) => ({
+        // Backend returns { goals: [...] }
+        const goalsList = response.goals || response;
+        this.sharedGoals = Array.isArray(goalsList)
+          ? goalsList.map((g: any) => ({
               id: g._id, // use _id from backend
               description: g.description,
               isActive: g.isActive,
@@ -73,7 +75,8 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
         const session = this.getSession();
         if (!session) throw new Error('Session not found');
         const response = await ApiService.callConceptAction<any>('SharedGoals', '_getSharedGoalById', { session, users, sharedGoalId });
-        return response;
+        // Backend returns { goal: {...} }
+        return response.goal || response;
       } catch (err: any) {
         this.error = err.message || 'Failed to fetch shared goal.';
         return null;
@@ -148,8 +151,10 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
         const session = this.getSession();
         if (!session) throw new Error('Session not found');
         const response = await ApiService.callConceptAction<any>('SharedGoals', '_getSharedSteps', { session, sharedGoal });
-          this.steps = Array.isArray(response)
-            ? response.map((s: any) => ({
+          // Backend returns { steps: [...] }
+          const stepsList = response.steps || response;
+          this.steps = Array.isArray(stepsList)
+            ? stepsList.map((s: any) => ({
                 id: s.id || s._id,
                 description: s.description,
                 start: s.start,
@@ -233,11 +238,7 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
         const response = await ApiService.callConceptAction<any>('SharedGoals', 'completeSharedStep', { session, step });
         if (response.error) throw new Error(response.error);
         await this.fetchSharedSteps(sharedGoal);
-        // If all steps are now completed, close the goal
-        const allComplete = this.steps.length > 0 && this.steps.every(s => !!s.completion);
-        if (allComplete) {
-          await this.closeSharedGoal({ sharedGoal });
-        }
+        // Removed auto-close logic - let users manually close the goal
       } catch (err: any) {
         this.error = err.message || 'Failed to complete shared step.';
         throw err;

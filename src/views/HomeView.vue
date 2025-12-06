@@ -16,7 +16,7 @@
       <div class="home-features">
         <div class="feature-card">
           <h2>Find a Buddy</h2>
-          <p>Match with students for one-time or semester-long runs.</p>
+          <p>Match with students for one-time or a longer-term basis.</p>
         </div>
         <div class="feature-card">
           <h2>Shared Goals</h2>

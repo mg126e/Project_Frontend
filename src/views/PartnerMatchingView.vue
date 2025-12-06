@@ -1,10 +1,10 @@
 <template>
   <section class="matches-page">
     <div class="matches-buttons">
-      <router-link to="/find-buddy" class="match-button">
+      <router-link to="/find-buddy" class="onetime-button">
         <h2>One Run Matching</h2>
       </router-link>
-      <router-link to="/matches/partner" class="match-button">
+      <router-link to="/matches/partner" class="onetime-button partner-button">
         <h2>Partner Matching</h2>
       </router-link>
     </div>
@@ -31,39 +31,42 @@
   justify-content: center;
 }
 
-.match-button {
+.onetime-button {
   flex: 1;
   min-width: 300px;
   max-width: 400px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: var(--color-primary);
+  background: var(--color-primary);
+  color: white;
   text-decoration: none;
-  border-radius: 24px;
+  border-radius: 16px;
   padding: 4rem 3rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 1px rgba(255, 255, 255, 0.3);
-  border: none;
+  transition: all 0.3s ease;
 }
 
-.match-button:hover {
+.onetime-button:hover {
+  background: var(--color-primary-dark);
   transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.25);
-  outline: 3px solid var(--color-accent);
 }
 
-.match-button h2 {
+.onetime-button h2 {
   margin: 0;
   font-size: 2rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: white;
   text-align: center;
-  font-family: 'Open Sans', Arial, sans-serif;
+}
+
+.partner-button {
+  background: var(--color-accent);
+  color: white;
+}
+
+.partner-button:hover {
+  background: var(--color-accent-dark);
+  transform: translateY(-4px);
 }
 
 @media (max-width: 768px) {
@@ -72,7 +75,7 @@
     gap: 2rem;
   }
   
-  .match-button {
+  .onetime-button {
     max-width: 100%;
   }
 }

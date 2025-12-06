@@ -79,7 +79,7 @@
               </li>
             </template>
           </draggable>
-          <button type="button" @click="handleAddStep" :disabled="!!validationError" class="next-button">Add Manual Step</button>
+          <button type="button" @click="handleAddStep" :disabled="!manualStepInput.trim()" class="next-button">Add Manual Step</button>
           <button type="button" @click="saveGoal" :disabled="steps.length === 0 || !goalDescription.trim() || saving" class="primary-button">
             <span v-if="saving" class="button-spinner"></span>
             <span v-else>Save Goal & Steps</span>
@@ -271,9 +271,9 @@ async function regenerateSteps() {
     const generatedSteps = genResult?.steps || [];
     
     if (generatedSteps.length > 0) {
-      steps.value = generatedSteps.map((s) => ({ id: s._id, description: s.description }));
+      steps.value = generatedSteps.map((s) => ({ id: s.id || s._id, description: s.description }));
       // Track original step IDs to detect deletions later
-      originalStepIds.value = generatedSteps.map((s) => s._id);
+      originalStepIds.value = generatedSteps.map((s) => s.id || s._id);
       generationError.value = ''; // Clear any previous errors
     } else {
       generationError.value = 'No steps were generated. Try regenerating or add steps manually.';
@@ -303,7 +303,6 @@ async function chooseMethod(selected) {
       if (!goalId) {
         try {
           const goalResult = await sharedGoalsStore.createSharedGoal({ users, description: goalDescription.value });
-          console.log('[GoalCreationModal] createSharedGoal result:', goalResult);
           // Check if createSharedGoal returned a valid goal ID
           if (!goalResult || typeof goalResult !== 'string') {
             console.error('[GoalCreationModal] Invalid goal result:', goalResult);
@@ -313,23 +312,18 @@ async function chooseMethod(selected) {
           }
           goalId = goalResult;
           goalIdRef.value = goalId;
-          console.log('[GoalCreationModal] Goal created with ID:', goalId);
         } catch (createError) {
           // Handle the error from createSharedGoal
-          console.error('[GoalCreationModal] Error creating goal:', createError);
           generationError.value = createError instanceof Error ? createError.message : 'Failed to create goal.';
           generating.value = false;
           return;
         }
       }
       // 2. Generate steps using backend - returns { steps: [...], error: '...' }
-      console.log('[GoalCreationModal] Calling generateSharedSteps with goalId:', goalId);
       const genResult = await sharedGoalsStore.generateSharedSteps({ sharedGoal: goalId });
-      console.log('[GoalCreationModal] generateSharedSteps result:', genResult);
       
       // Check for errors first
       if (genResult && genResult.error) {
-        console.error('[GoalCreationModal] Error generating steps:', genResult.error);
         generationError.value = genResult.error;
         generating.value = false;
         step.value = 2; // Still go to step 2 so user can see error and regenerate
@@ -340,9 +334,9 @@ async function chooseMethod(selected) {
       const generatedSteps = genResult?.steps || [];
       
       if (generatedSteps.length > 0) {
-        steps.value = generatedSteps.map((s) => ({ id: s._id, description: s.description }));
+        steps.value = generatedSteps.map((s) => ({ id: s.id || s._id, description: s.description }));
         // Track original step IDs to detect deletions later
-        originalStepIds.value = generatedSteps.map((s) => s._id);
+        originalStepIds.value = generatedSteps.map((s) => s.id || s._id);
         generationError.value = ''; // Clear any previous errors
       } else {
         console.warn('[GoalCreationModal] No steps generated')

@@ -3,74 +3,38 @@
     <span class="spinner"></span>
   </div>
   <div v-else class="dashboard-home">
-    <h1>{{ greeting }}{{ displayName ? `, ${displayName}` : '' }}!</h1>
-    <p class="dashboard-welcome-msg">Check out your important stats!</p>
+    <h1 class="fade-in">{{ greeting }}{{ displayName ? `, ${displayName}` : '' }}!</h1>
+    <p v-if="welcomeMessageVisible" class="dashboard-welcome-msg fade-in">{{ stats.matches === 0 ? 'Ready to get started?' : 'Ready to continue your great work?' }}</p>
     <div class="dashboard-stats">
-      <div v-if="stats.matches > 0" class="stat-card">
+      <div class="stat-card" :class="{ 'card-visible': cardsVisible }" style="animation-delay: 0.1s">
+        <div class="stat-label">Matches</div>
+        <div class="stat-value">{{ animatedStats.matches }}</div>
+        <div v-if="stats.matches === 0" class="stat-hint">
+          <router-link to="/matches" class="stat-cta">Find a running partner</router-link>
+      </div>
+      </div>
+      <div v-if="stats.matches > 0" class="stat-card" :class="{ 'card-visible': cardsVisible }" style="animation-delay: 0.2s">
         <div class="stat-label">Total Goals</div>
-        <div class="stat-value">{{ stats.goals }}</div>
+        <div class="stat-value">{{ animatedStats.goals }}</div>
         <div v-if="stats.goals === 0" class="stat-hint">
           <router-link to="/goals" class="stat-cta">Create your first goal</router-link>
         </div>
       </div>
-      <div v-if="stats.matches > 0" class="stat-card">
-        <div class="stat-label">Milestones</div>
-        <div class="stat-value">{{ stats.milestones }}</div>
-        <div v-if="stats.milestones === 0" class="stat-hint">
-          <router-link to="/milestones" class="stat-cta">Create your first milestone</router-link>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Matches</div>
-        <div class="stat-value">{{ stats.matches }}</div>
-        <div v-if="stats.matches === 0" class="stat-hint">
-          <router-link to="/matches" class="stat-cta">Find a running partner</router-link>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="pendingInvites.length" class="pending-invites-section">
-      <h2 class="pending-invites-title">Pending Invites</h2>
-      <div class="pending-invites-list">
-        <div v-for="invite in pendingInvites" :key="invite.id" class="invite-card">
-          <div class="invite-info">
-            <span class="invite-from">
-            From: <b class="profile-link" @click="openProfileModal(invite.profile)">{{ invite.from }}</b>
-            </span>
-            <span class="invite-message">{{ invite.message }}</span>
-          </div>
-          <div class="invite-actions">
-            <button class="btn-accept" @click="acceptInvite(invite.id)">Accept</button>
-            <button class="btn-decline" @click="declineInvite(invite.id)">Decline</button>
-          </div>
-        </div>
-      </div>
-      <ProfileSnapshotModal
-  v-if="showProfileModal && modalProfile"
-  :profile="modalProfile"
-  :show="showProfileModal"
-  @close="closeProfileModal"
-/>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 
-
-import { ref, computed, onMounted, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useProfileStore } from '../stores/profile';
 import { useSharedGoalsStore } from '../stores/sharedGoals';
-import { getFromStorage, setToStorage } from '../utils';
 import { ApiService } from '../services/api';
-import ProfileSnapshotModal from '../components/ProfileSnapshotModal.vue';
 
 const auth = useAuthStore();
 const profileStore = useProfileStore();
 const sharedGoalsStore = useSharedGoalsStore();
-const router = useRouter();
 
 const displayName = computed(() => {
   const profile = profileStore.profile;
@@ -86,63 +50,34 @@ const greeting = computed(() => {
 
 const stats = ref({
   goals: 0,
-  milestones: 0,
   matches: 0,
-  messages: 0,
 });
 
-// Get list of handled invite IDs from localStorage
-function getHandledInviteIds(): string[] {
-  return getFromStorage<string[]>('handledInviteIds', []);
-}
+const animatedStats = ref({
+  goals: 0,
+  matches: 0,
+});
 
-// Save an invite ID as handled
-function markInviteAsHandled(id: string) {
-  const handled = getHandledInviteIds();
-  if (!handled.includes(id)) {
-    handled.push(id);
-    setToStorage('handledInviteIds', handled);
-  }
-}
+const cardsVisible = ref(false);
+const welcomeMessageVisible = ref(false);
 
-// All available invites (TODO: Replace with real API call)
-const allInvites: Array<{ id: string; from: string; message: string; profile: any }> = [
-  // Invites will be populated from API
-];
+function animateNumber(key: 'goals' | 'matches', target: number) {
+  const duration = 1000;
+  const steps = 30;
+  const increment = target / steps;
+  let current = 0;
+  let step = 0;
 
-// Filter out handled invites
-const handledIds = getHandledInviteIds();
-const pendingInvites = ref(
-  allInvites.filter(invite => !handledIds.includes(invite.id))
-);
-
-const showProfileModal = ref(false);
-const modalProfile = ref(null);
-
-function openProfileModal(profile: any) {
-  modalProfile.value = profile;
-  showProfileModal.value = true;
-}
-function closeProfileModal() {
-  showProfileModal.value = false;
-  modalProfile.value = null;
-}
-
-async function acceptInvite(id: string) {
-  // TODO: Replace with real API call
-  markInviteAsHandled(id);
-  pendingInvites.value = pendingInvites.value.filter(invite => invite.id !== id);
-  // Wait for Vue to update the DOM before navigating
-  await nextTick();
-  // Optionally show a toast/notification
-  router.push('/messages');
-}
-
-function declineInvite(id: string) {
-  // TODO: Replace with real API call
-  markInviteAsHandled(id);
-  pendingInvites.value = pendingInvites.value.filter(invite => invite.id !== id);
-  // Optionally show a toast/notification
+  const interval = setInterval(() => {
+    step++;
+    current += increment;
+    if (step >= steps) {
+      animatedStats.value[key] = target;
+      clearInterval(interval);
+    } else {
+      animatedStats.value[key] = Math.floor(current);
+    }
+  }, duration / steps);
 }
 
 async function fetchMatches() {
@@ -152,7 +87,6 @@ async function fetchMatches() {
   }
 
   try {
-    // Use the correct endpoint: _getMatches from OneRunMatching concept
     const result = await ApiService.callConceptAction<any>(
       'OneRunMatching',
       '_getMatches',
@@ -183,86 +117,20 @@ onMounted(async () => {
   await fetchMatches();
   
   stats.value.goals = sharedGoalsStore.sharedGoals.length;
-  stats.value.milestones = 0; // TODO: Implement milestones tracking
-  stats.value.messages = 0; // TODO: Implement messages tracking
+
+  // Trigger animations after data is loaded
+  setTimeout(() => {
+    welcomeMessageVisible.value = true;
+    cardsVisible.value = true;
+    animateNumber('goals', stats.value.goals);
+    animateNumber('matches', stats.value.matches);
+  }, 100);
 });
 </script>
 
 <style scoped>
-.pending-invites-section {
-  margin-top: 2.5rem;
-  background: #f7fafd;
-  border-radius: 12px;
-  padding: 1.5rem 2rem 2rem 2rem;
-  text-align: left;
-}
-.pending-invites-title {
-  color: var(--color-primary);
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-bottom: 1.2rem;
-}
-.pending-invites-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-.invite-card {
-  background: #F9FAFB;
-  border-radius: 8px;
-  padding: 1.1rem 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.invite-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-.invite-from {
-  color: var(--color-primary);
-  font-weight: 600;
-}
-.invite-message {
-  color: #444;
-  font-size: 1.01rem;
-}
-.invite-actions {
-  display: flex;
-  gap: 0.7rem;
-}
-.btn-accept {
-  background: var(--color-primary);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 0.5em 1.2em;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-accept:hover {
-  background: var(--color-primary-dark);
-}
-.btn-decline {
-  background: #F9FAFB;
-  color: var(--color-error);
-  border: 1.5px solid var(--color-error);
-  border-radius: 6px;
-  padding: 0.5em 1.2em;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-decline:hover {
-  background: var(--color-error);
-  color: #fff;
-}
 .dashboard-home {
-  max-width: 900px;
+  max-width: 1000px;
   margin: 2.5rem auto;
   background: #F9FAFB;
   border-radius: 16px;
@@ -279,6 +147,19 @@ onMounted(async () => {
   font-size: 1.35rem;
   margin-bottom: 2.5rem;
 }
+
+.fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    transform: translateY(-10px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
 .dashboard-stats {
   display: flex;
   justify-content: center;
@@ -287,26 +168,50 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 .stat-card {
-  background: #f7fafd;
+  background: var(--color-primary-light);
   border-radius: 12px;
   padding: 1.4rem 3rem;
   min-width: 160px;
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+  transition: all 0.3s ease;
+  cursor: default;
 }
+
+.stat-card.card-visible {
+  animation: slideUp 0.6s ease-out forwards;
+}
+
+@keyframes slideUp {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.stat-card:hover {
+  transform: translateY(-8px) scale(1.05);
+}
+
 .stat-label {
   color: var(--color-primary);
   font-weight: 600;
   font-size: 1.1rem;
   margin-bottom: 0.6em;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 .stat-value {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #222;
+  color: #000000;
+  background: var(--color-accent);
+  background-clip: text;
 }
 .stat-hint {
   margin-top: 1rem;
   font-size: 0.95rem;
-  color: #666;
+  color: #000000;
   font-style: italic;
 }
 .stat-cta {
@@ -338,16 +243,5 @@ onMounted(async () => {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-}
-.profile-link {
-  color: var(--color-accent);
-  cursor: pointer;
-  border-radius: 6px;
-  padding: 0.1em 0.4em;
-  transition: color 0.2s, background 0.2s;
-}
-.profile-link:hover {
-  background: #fdf4e8;
-  text-decoration: none;
 }
 </style>

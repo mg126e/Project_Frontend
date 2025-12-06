@@ -36,7 +36,7 @@ async function onLogin() {
   const success = await auth.login(username.value, password.value)
   loading.value = false
   if (success) {
-    router.push({ path: '/app/dashboard' })
+    router.push({ path: '/dashboard' })
   } else {
     error.value = 'Invalid username or password.'
   }
