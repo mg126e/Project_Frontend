@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard-layout">
     <nav class="topbar">
-      <router-link to="/dashboard" class="topbar-logo">
+      <router-link to="/app/dashboard" class="topbar-logo">
         <h1>RunBuddy</h1>
       </router-link>
       <ul>

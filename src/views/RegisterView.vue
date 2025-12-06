@@ -81,17 +81,10 @@ async function handleVerified({ verificationRecordId: recordId, verificationCode
   if (recordId) {
     verificationRecordId.value = recordId
   }
-  console.log('[RegisterView] Registration with:', {
-    username: username.value,
-    email: email.value,
-    verificationRecordId: recordId || verificationRecordId.value,
-    verificationCode: code
-  })
   // Call the registration endpoint after successful verification
   loading.value = true
   try {
     const regResponse = await authRegisterAfterVerification(username.value, password.value, email.value, recordId || verificationRecordId.value, code)
-    console.log('Registration response:', regResponse)
     if (regResponse.error) {
       error.value = regResponse.error
       loading.value = false
@@ -156,11 +149,8 @@ async function authRegisterAfterVerification(username, password, email, verifica
       verificationRecordId,
       verificationCode
     }
-    console.log('[RegisterView] Sending registration request:', { ...payload, password: '***' })
-    console.log('[RegisterView] API endpoint: /PasswordAuthentication/register')
     // This endpoint should check verification and create the user
     const response = await ApiService.post('/PasswordAuthentication/register', payload)
-    console.log('[RegisterView] Registration response received:', response)
     return response
   } catch (e) {
     console.error('[RegisterView] Registration error:', e)
