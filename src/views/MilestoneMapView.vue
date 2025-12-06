@@ -52,6 +52,18 @@
         </div>
         <div v-else class="milestone-items">
           <div v-for="milestone in milestones" :key="milestone.id" class="milestone-item">
+            <div v-if="milestone.photoFileId" class="thumbnail-container">
+              <img 
+                v-if="imageUrls[milestone.photoFileId]" 
+                :src="imageUrls[milestone.photoFileId]" 
+                alt="Milestone photo"
+                class="milestone-thumbnail"
+                @click="showFullImage(milestone.photoFileId)"
+              />
+              <div v-else class="thumbnail-loading">
+                <div class="mini-spinner"></div>
+              </div>
+            </div>
             <div class="milestone-content">
               <h4>{{ milestone.title }}</h4>
               <p>{{ milestone.description }}</p>
@@ -85,6 +97,20 @@
             <div class="coordinates">
               <input v-model.number="newMilestone.latitude" type="number" step="0.000001" placeholder="Latitude" />
               <input v-model.number="newMilestone.longitude" type="number" step="0.000001" placeholder="Longitude" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Photo (Optional)</label>
+            <input 
+              type="file" 
+              accept="image/*" 
+              @change="handleImageSelect" 
+              ref="fileInput"
+              class="file-input"
+            />
+            <div v-if="imagePreview" class="image-preview">
+              <img :src="imagePreview" alt="Preview" />
+              <button @click="removeImage" class="remove-image-button" type="button">&times;</button>
             </div>
           </div>
           <div v-if="milestoneError" class="error-message">{{ milestoneError }}</div>
@@ -132,6 +158,14 @@
       @close="cancelRemoveMilestone"
       @confirm="confirmRemoveMilestone"
     />
+
+    <!-- Full Image Modal -->
+    <div v-if="fullImageUrl" class="modal-overlay" @click="closeFullImage">
+      <div class="full-image-modal" @click.stop>
+        <button @click="closeFullImage" class="close-button">&times;</button>
+        <img :src="fullImageUrl" alt="Full size milestone photo" />
+      </div>
+    </div>
   </section>
 </template>
 
@@ -198,6 +232,13 @@ const mapLoading = ref(false);
 const showConfirmModal = ref(false);
 const milestoneToRemove = ref<string | null>(null);
 
+// Image handling
+const fileInput = ref<HTMLInputElement | null>(null);
+const selectedImage = ref<File | null>(null);
+const imagePreview = ref<string | null>(null);
+const fullImageUrl = ref<string | null>(null);
+const imageUrls = ref<{ [fileId: string]: string }>({});
+
 // Milestone author names cache
 const milestoneAuthors = ref<{ [key: string]: string }>({});
 
@@ -251,6 +292,75 @@ function getMilestoneAuthor(addedBy: string): string {
     return 'You';
   }
   return milestoneAuthors.value[addedBy] || 'Loading...';
+}
+
+function handleImageSelect(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  
+  if (file) {
+    selectedImage.value = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      imagePreview.value = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function removeImage() {
+  selectedImage.value = null;
+  imagePreview.value = null;
+  if (fileInput.value) {
+    fileInput.value.value = '';
+  }
+}
+
+function getMilestoneImageUrl(photoFileId: string): void {
+  // Skip if already cached or in progress
+  if (imageUrls.value[photoFileId]) {
+    return;
+  }
+  
+  // Fetch URL asynchronously and cache it
+  console.log('Fetching download URL for:', photoFileId);
+  ApiService.getDownloadURL(photoFileId).then(result => {
+    console.log('Raw download URL result:', result);
+    
+    // Handle both array and object responses (similar to UserProfileView)
+    const responseData = Array.isArray(result) ? result[0] : result;
+    
+    if (responseData && 'downloadURL' in responseData && !('error' in responseData)) {
+      let downloadURL = responseData.downloadURL;
+      console.log('Got download URL from response:', downloadURL);
+      
+      // If it's a relative URL, prepend the backend base URL
+      if (downloadURL && downloadURL.startsWith('/api/')) {
+        const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+        downloadURL = baseURL.replace(/\/api$/, '') + downloadURL;
+        console.log('Converted to absolute URL:', downloadURL);
+      }
+      
+      imageUrls.value[photoFileId] = downloadURL;
+    } else if ('error' in responseData) {
+      console.error('Error in download URL result:', responseData.error);
+    } else {
+      console.error('Unexpected response structure:', responseData);
+    }
+  }).catch(e => {
+    console.error('Failed to get download URL:', e);
+  });
+}
+
+function showFullImage(photoFileId: string) {
+  const url = imageUrls.value[photoFileId];
+  if (url) {
+    fullImageUrl.value = url;
+  }
+}
+
+function closeFullImage() {
+  fullImageUrl.value = null;
 }
 
 async function loadMaps() {
@@ -353,6 +463,13 @@ async function loadMilestones() {
       }
     }
     
+    // Prefetch image URLs for milestones with photos
+    for (const milestone of milestones.value) {
+      if (milestone.photoFileId && !imageUrls.value[milestone.photoFileId]) {
+        getMilestoneImageUrl(milestone.photoFileId);
+      }
+    }
+    
     updateMapMarkers();
   } catch (e: any) {
     console.error('Failed to load milestones:', e);
@@ -400,8 +517,21 @@ function updateMapMarkers() {
 
   // Add new markers
   milestones.value.forEach(milestone => {
+    // Build popup content with optional image
+    let popupContent = `<div style="text-align: center;">`;
+    
+    if (milestone.photoFileId && imageUrls.value[milestone.photoFileId]) {
+      popupContent += `<img src="${imageUrls.value[milestone.photoFileId]}" 
+        alt="${milestone.title}" 
+        style="max-width: 180px; max-height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; display: block;" />`;
+    }
+    
+    popupContent += `<strong style="font-size: 14px;">${milestone.title}</strong><br>
+      <span style="font-size: 12px; color: #666;">${milestone.description}</span>
+    </div>`;
+    
     const marker = L.marker([milestone.latitude, milestone.longitude])
-      .bindPopup(`<strong>${milestone.title}</strong><br>${milestone.description}`)
+      .bindPopup(popupContent, { maxWidth: 220 })
       .addTo(map!);
     markers.value.push(marker);
   });
@@ -423,6 +553,44 @@ async function addMilestone() {
   milestoneError.value = null;
 
   try {
+    let photoFileId: string | undefined;
+
+    // Upload image if one was selected
+    if (selectedImage.value && auth.session) {
+      // Step 1: Request upload URL
+      const uploadUrlResult = await ApiService.requestUploadURL(
+        auth.session,
+        selectedImage.value.name,
+        selectedImage.value.type
+      );
+
+      if ('error' in uploadUrlResult) {
+        throw new Error(uploadUrlResult.error);
+      }
+
+      // Step 2: Upload file to the URL
+      const uploadResponse = await fetch(uploadUrlResult.uploadURL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': selectedImage.value.type,
+        },
+        body: selectedImage.value,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload image to storage');
+      }
+
+      // Step 3: Confirm upload
+      const confirmResult = await ApiService.confirmUpload(uploadUrlResult.file);
+      
+      if ('error' in confirmResult) {
+        throw new Error(confirmResult.error);
+      }
+
+      photoFileId = confirmResult.file;
+    }
+
     await ApiService.callConceptAction(
       'MilestoneMap',
       'addMilestone',
@@ -432,6 +600,7 @@ async function addMilestone() {
         longitude: newMilestone.value.longitude,
         title: newMilestone.value.title,
         description: newMilestone.value.description,
+        ...(photoFileId && { photoFileId }),
       }
     );
 
@@ -486,6 +655,7 @@ function closeAddMilestoneModal() {
     longitude: 0,
   };
   milestoneError.value = null;
+  removeImage();
 }
 
 async function loadPartners() {
@@ -982,5 +1152,114 @@ onMounted(async () => {
 .primary-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.file-input {
+  cursor: pointer;
+}
+
+.image-preview {
+  position: relative;
+  margin-top: 1rem;
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 300px;
+}
+
+.image-preview img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.remove-image-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+}
+
+.remove-image-button:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.thumbnail-container {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.milestone-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.milestone-thumbnail:hover {
+  transform: scale(1.05);
+}
+
+.thumbnail-loading {
+  width: 100%;
+  height: 100%;
+  background: #f0f0f0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e0e0e0;
+  border-top: 3px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.full-image-modal {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.full-image-modal img {
+  display: block;
+  max-width: 100%;
+  max-height: 90vh;
+  width: auto;
+  height: auto;
+}
+
+.full-image-modal .close-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  z-index: 1;
+}
+
+.full-image-modal .close-button:hover {
+  background: rgba(0, 0, 0, 0.8);
 }
 </style>
