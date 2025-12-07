@@ -12,6 +12,24 @@
       {{ error }}
     </div>
 
+    <!-- Debug Info (remove in production) -->
+    <div v-if="false" class="debug-info" style="background: #f0f0f0; padding: 1rem; margin: 1rem 0; border-radius: 8px; font-size: 0.9rem;">
+      <h3>Debug Info</h3>
+      <p><strong>Total invites in store:</strong> {{ oneRunStore.invites.length }}</p>
+      <p><strong>Invites created:</strong> {{ invitesCreated.length }}</p>
+      <p><strong>Invites received:</strong> {{ invitesReceived.length }}</p>
+      <p><strong>Current user ID:</strong> {{ authStore.user?.id }}</p>
+      <p><strong>Loading:</strong> {{ loading }}</p>
+      <details>
+        <summary>All Invites ({{ oneRunStore.invites.length }})</summary>
+        <pre style="max-height: 200px; overflow: auto;">{{ JSON.stringify(oneRunStore.invites, null, 2) }}</pre>
+      </details>
+      <details>
+        <summary>Invites Received Filtered ({{ invitesReceived.length }})</summary>
+        <pre style="max-height: 200px; overflow: auto;">{{ JSON.stringify(invitesReceived, null, 2) }}</pre>
+      </details>
+    </div>
+
     <!-- Create Invite Section -->
     <div class="create-invite-section">
       <h2>Create & Send Run Invite</h2>
@@ -94,15 +112,16 @@
       </div>
     </div>
 
-    <!-- Received Invites -->
-    <div v-if="invitesReceived.length > 0" class="invites-section">
-      <h2>Received Invites</h2>
+    <!-- Available Invites (all invites in user's region - open for anyone to accept) -->
+    <div v-if="availableInvites.length > 0" class="invites-section">
+      <h2>Available Invites in Your Region</h2>
+      <p class="page-description" style="margin-bottom: 1rem;">These are run invites in your region that you can join!</p>
       <div class="invites-list">
-        <div v-for="invite in invitesReceived" :key="invite._id" class="invite-card received">
+        <div v-for="invite in availableInvites" :key="invite._id" class="invite-card received">
           <div class="invite-info">
             <div class="invite-header">
               <h3>{{ formatDate(invite.start) }}</h3>
-              <span class="invite-status pending">Pending</span>
+              <span class="invite-status pending">Available</span>
             </div>
             <div class="invite-details">
               <p><strong>Distance:</strong> {{ invite.distance }} miles</p>
@@ -113,9 +132,6 @@
           <div class="invite-actions">
             <button @click="handleAcceptInvite(invite._id)" class="btn-accept" :disabled="processingInvite === invite._id">
               {{ processingInvite === invite._id ? 'Processing...' : 'Accept' }}
-            </button>
-            <button @click="handleDeclineInvite(invite._id)" class="btn-decline" :disabled="processingInvite === invite._id">
-              Decline
             </button>
           </div>
         </div>
@@ -140,14 +156,14 @@
     </div>
 
     <!-- Empty State -->
-    <div v-if="!loading && !invitesCreated.length && !invitesReceived.length && !activeRuns.length" class="empty-state">
+    <div v-if="!loading && !invitesCreated.length && !availableInvites.length && !activeRuns.length" class="empty-state">
       <p>No invites or runs yet. Create your first invite to find a running buddy!</p>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, onActivated } from 'vue'
 import { useOneRunMatchingStore, type Invite } from '../stores/oneRunMatching'
 import { useProfileStore } from '../stores/profile'
 import { useAuthStore } from '../stores/auth'
@@ -173,16 +189,19 @@ const newInvite = ref({
 // Computed
 const error = computed(() => oneRunStore.error)
 const invitesCreated = computed(() => oneRunStore.invites.filter(inv => inv.inviter === authStore.user?.id))
-const invitesReceived = computed(() => {
+// Available invites: all invites in user's region that are open for anyone to accept
+// These come from getActiveInvitesForUser - invites are open for anyone in the region
+// The backend should automatically add users in the region to the invitees array
+const availableInvites = computed(() => {
   const userId = authStore.user?.id
   if (!userId) return []
-  // Only show pending invites - accepted invites should never appear here
-  // Once an invite is accepted, it's removed so no other users can accept it
+  
+  // Show all pending invites in the user's region (from getActiveInvitesForUser)
+  // Invites are open for anyone in the region to accept
   return oneRunStore.invites.filter(inv => 
     inv.sent && 
     inv.acceptanceStatus === 'pending' && 
-    inv.inviter !== userId &&
-    inv.invitees.includes(userId)
+    inv.inviter !== userId
   )
 })
 
@@ -201,6 +220,21 @@ const canCreateInvite = computed(() => {
   )
 })
 const activeRuns = computed(() => oneRunStore.activeRuns)
+
+// Helper function to extract state from location (e.g., "Boston, MA" -> "MA")
+// This ensures we match by state, not exact city and state
+function extractStateFromLocation(location: string): string {
+  if (!location) return ''
+  // Split by comma and take the last part (should be the state)
+  const parts = location.split(',')
+  if (parts.length > 1) {
+    // Get the last part and trim whitespace
+    const state = parts[parts.length - 1]?.trim()
+    return state || location.trim()
+  }
+  // If no comma, return the whole location (might just be a state)
+  return location.trim()
+}
 
 // Methods
 function formatDate(dateString: string): string {
@@ -314,6 +348,9 @@ async function handleCancelRun(runId: string) {
   const result = await oneRunStore.cancelRun(runId)
   if (!result.success && result.error) {
     alert(result.error)
+  } else {
+    // Refresh data to update the UI after cancellation
+    await loadData()
   }
 }
 
@@ -325,26 +362,25 @@ async function loadData() {
       await profileStore.fetchProfile()
     }
 
-    // Set region from profile location
+    // Set region from profile location - extract just the state for matching
     if (profileStore.profile.location) {
-      // Extract region from location (e.g., "San Francisco, CA" -> "CA" or use full location)
-      const location = profileStore.profile.location
-      // For now, use the full location as region, or extract state
-      const parts = location.split(',')
-      newInvite.value.region = parts.length > 1 ? parts[parts.length - 1]?.trim() || location.trim() : location.trim()
+      // Extract state from location (e.g., "San Francisco, CA" -> "MA")
+      // This ensures users see invites from all cities in their state
+      newInvite.value.region = extractStateFromLocation(profileStore.profile.location)
     }
 
-    // Load invites and runs
+    // Load invites and runs - use state as region for filtering
     const region = newInvite.value.region || (profileStore.profile.location ? 
-      (() => {
-        const location = profileStore.profile.location || ''
-        const parts = location.split(',')
-        return parts.length > 1 ? parts[parts.length - 1]?.trim() || location.trim() : location.trim()
-      })() : undefined)
+      extractStateFromLocation(profileStore.profile.location) : undefined)
     
+    // Fetch all data in parallel
+    // fetchActiveInvites() should run when user has set their region to see all matches
+    // Uses getActiveInvitesForUser which filters by the user's region (users are auto-registered when they set location)
     await Promise.all([
       oneRunStore.fetchMatches(),
       oneRunStore.fetchUserInvites(region),
+      // Call getActiveInvitesForUser to get all active invites filtered by the user's region
+      oneRunStore.fetchActiveInvites(),
     ])
   } finally {
     loading.value = false
@@ -354,6 +390,30 @@ async function loadData() {
 onMounted(() => {
   loadData()
 })
+
+// Also call when route is activated (for keep-alive routes or when navigating back)
+onActivated(() => {
+  // If profile has location, ensure active invites are fetched
+  if (profileStore.profile.location) {
+    oneRunStore.fetchActiveInvites()
+  }
+})
+
+// Watch for profile location changes - when user sets their region, fetch active invites
+watch(
+  () => profileStore.profile.location,
+  async (newLocation) => {
+    if (newLocation) {
+      // Extract state from new location (e.g., "Boston, MA" -> "MA")
+      // This ensures users see invites from all cities in their state
+      newInvite.value.region = extractStateFromLocation(newLocation)
+      
+      // Fetch active invites when region is set/updated
+      await oneRunStore.fetchActiveInvites()
+    }
+  },
+  { immediate: false }
+)
 </script>
 
 <style scoped>

@@ -39,7 +39,8 @@
       </div>
 
       <div v-else class="invite-info-card">
-        <p>Loading invite details...</p>
+        <h2>Run Details</h2>
+        <p style="color: var(--color-secondary);">Run information is being loaded. You can still view and manage the run below.</p>
       </div>
 
       <div class="run-partners">
@@ -144,26 +145,78 @@ async function loadRunData() {
     const runId = route.params.id as string
     if (!runId) {
       error.value = 'Run ID not provided'
+      loading.value = false
       return
     }
 
-    // Fetch the run
-    const fetchedRun = await oneRunStore.fetchRun(runId)
-    if (!fetchedRun) {
-      error.value = 'Run not found'
+    // Fetch the run with invite - backend returns both in the response
+    // invite will be null if user is not a participant in the run
+    const result = await oneRunStore.fetchRunWithInvite(runId)
+    if (!result || !result.run) {
+      error.value = result?.error || 'Run not found'
+      console.error('[ScheduledRunView] Run not found:', runId, result?.error)
+      loading.value = false
       return
     }
-    run.value = fetchedRun
+    
+    // Check for error in response
+    if (result.error) {
+      error.value = result.error
+      console.warn('[ScheduledRunView] Error in response:', result.error)
+    }
+    
+    run.value = result.run
+    
+    console.log('[ScheduledRunView] Result invite:', result.invite)
+    console.log('[ScheduledRunView] Result invite type:', typeof result.invite)
+    console.log('[ScheduledRunView] Result invite is null?', result.invite === null)
+    console.log('[ScheduledRunView] Result invite is undefined?', result.invite === undefined)
+    
+    // Set loading to false immediately so buttons work
+    loading.value = false
+    
+    // If invite is null, try to find it separately
+    if (result.invite) {
+      console.log('[ScheduledRunView] Setting invite from response:', result.invite)
+      invite.value = result.invite
+    } else {
+      // Try to find the invite associated with this run
+      console.log('[ScheduledRunView] Invite not in response, searching for invite...')
+      oneRunStore.findInviteForRun(result.run).then(foundInvite => {
+        if (foundInvite) {
+          console.log('[ScheduledRunView] Found invite:', foundInvite)
+          // Backend may return {invite: {...}} or just the invite directly
+          const inviteData = ('invite' in foundInvite && foundInvite.invite) ? foundInvite.invite : foundInvite
+          // Ensure invite.start is a string (ISO 8601 format)
+          const processedInvite = {
+            ...inviteData,
+            start: typeof inviteData.start === 'string' ? inviteData.start : new Date(inviteData.start).toISOString()
+          }
+          console.log('[ScheduledRunView] Setting processed invite:', processedInvite)
+          invite.value = processedInvite as Invite
+        } else {
+          console.log('[ScheduledRunView] No invite found for this run')
+        }
+      }).catch(e => {
+        console.warn('[ScheduledRunView] Error finding invite:', e)
+      })
+    }
 
-    // Find the associated invite
-    const associatedInvite = await oneRunStore.findInviteForRun(fetchedRun)
-    invite.value = associatedInvite
-
-    // Fetch display names for both users
-    await fetchUserNames(fetchedRun.userA, fetchedRun.userB)
+    // Fetch display names for both users (don't block on this)
+    // Only fetch if userA and userB are defined
+    if (result.run?.userA && result.run?.userB) {
+      fetchUserNames(result.run.userA, result.run.userB).catch(e => {
+        console.warn('[ScheduledRunView] Failed to fetch user names:', e)
+      })
+    } else {
+      console.warn('[ScheduledRunView] Cannot fetch user names - userA or userB is missing', {
+        userA: result.run?.userA,
+        userB: result.run?.userB
+      })
+    }
   } catch (e) {
+    console.error('[ScheduledRunView] Error loading run data:', e)
     error.value = e instanceof Error ? e.message : 'Failed to load run details'
-  } finally {
     loading.value = false
   }
 }
@@ -258,8 +311,8 @@ async function handleCancelRun() {
     if (!result.success && result.error) {
       alert(result.error)
     } else {
-      // Navigate back to find buddy page
-      router.push('/dashboard/find-buddy')
+      // Navigate back to one-time run matching page
+      router.push({ name: 'run-buddy-finder' })
     }
   } finally {
     cancellingRun.value = false
