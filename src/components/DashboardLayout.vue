@@ -7,7 +7,7 @@
       <ul>
         <li><router-link to="/matches">Matches</router-link></li>
         <li><router-link to="/messages">Messages</router-link></li>
-        <li><router-link to="/goals">Shared Goals</router-link></li>
+        <li><router-link to="/goals">Goals</router-link></li>
         <li><router-link to="/milestones">Milestones</router-link></li>
       </ul>
       <div class="topbar-right">

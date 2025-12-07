@@ -1,6 +1,6 @@
 <template>
   <section class="shared-goals">
-    <h1>Shared Goals</h1>
+    <h1>Goals</h1>
     <div v-if="savingGoal" class="saving-overlay">
       <div class="saving-spinner"></div>
       <p>Saving your goal...</p>
@@ -39,9 +39,9 @@
       </div>
       <div v-for="user in userGroupsForCollapsible" :key="user.id" class="user-collapsible">
         <div class="user-header" @click="toggleUser(user.id)">
-      <span class="user-name">{{ user.displayname}}</span>
-      <span class="collapse-arrow">{{ openUsers[user.id] ? '▼' : '▶' }}</span>
-      </div>
+          <span class="user-name">{{ user.displayname}}</span>
+          <span class="collapse-arrow">{{ openUsers[user.id] ? '▼' : '▶' }}</span>
+        </div>
         <transition name="fade">
           <ul v-show="openUsers[user.id]" class="user-goal-list">
             <li v-for="goal in user.goals" :key="goal.id" class="goal-item">
@@ -78,7 +78,7 @@ import { useSharedGoalsStore } from '../stores/sharedGoals';
 import { useAuthStore } from '../stores/auth';
 import { useOneRunMatchingStore } from '../stores/oneRunMatching';
 import { storeToRefs } from 'pinia';
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { format } from 'date-fns';
 import { ApiService } from '../services/api';
 
@@ -150,10 +150,11 @@ const userGroupsForCollapsible = computed(() => {
   filteredGoals.value.forEach(goal => {
     (goal.users || []).forEach(u => {
       const id = typeof u === 'object' ? u.id : u;
-      // Always use the best available displayname (store guarantees fallback to id)
-      const displayname = typeof u === 'object' ? u.displayname : u;
       if (id && id !== auth.user.id) {
         if (!userMap[id]) {
+          // Use the displayname from matchedUsers if available (includes username in parentheses)
+          const matchedUser = matchedUsers.value.find(mu => mu.id === id);
+          const displayname = matchedUser ? matchedUser.displayname : (typeof u === 'object' ? u.displayname : id);
           userMap[id] = { id, displayname, goals: [] };
         }
         // Attach steps to the goal if not already present
@@ -274,16 +275,27 @@ async function fetchMatchedUsers() {
       }
     }
     
-    // 3. Fetch displaynames for all users
+    // 3. Fetch displaynames and usernames for all users
     const userIds = Object.keys(userMap);
     for (const userId of userIds) {
       try {
-        const result = await ApiService.callConceptAction('UserProfile', '_getDisplayName', {
-          user: userId
-        });
-        if (result && !('error' in result) && result.displayname) {
-          userMap[userId].displayname = result.displayname;
+        const [displaynameResult, usernameResult] = await Promise.allSettled([
+          ApiService.callConceptAction('UserProfile', '_getDisplayName', { user: userId }),
+          ApiService.callConceptAction('PasswordAuthentication', '_getUsername', { user: userId })
+        ]);
+        
+        let displayname = userId;
+        let username = '';
+        
+        if (displaynameResult.status === 'fulfilled' && displaynameResult.value && !('error' in displaynameResult.value)) {
+          displayname = displaynameResult.value.displayname;
         }
+        
+        if (usernameResult.status === 'fulfilled' && usernameResult.value && !('error' in usernameResult.value)) {
+          username = usernameResult.value.username;
+        }
+        
+        userMap[userId].displayname = username ? `${displayname} (${username})` : displayname;
       } catch (e) {
         console.warn('[SharedGoalsView] Could not fetch displayname for user:', userId);
       }
@@ -316,7 +328,7 @@ onMounted(async () => {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
-  background: #f6fff7;
+  background: var(--color-primary-light);
   border-radius: 8px;
   padding: 0.5rem 1rem;
   box-shadow: none;
@@ -363,11 +375,10 @@ onMounted(async () => {
   min-width: 140px;
 }
 .filter-dropdown:focus {
-  border-color: #106cb8;
+  border-color: var(--color-primary);
 }
 section.shared-goals {
   min-width: 800px;
-  background: #F9FAFB;
   border-radius: 24px;
   padding: 3.5rem 4.5rem 3.5rem 4.5rem;
 }
@@ -384,10 +395,6 @@ section.shared-goals {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-.goal-main {
-  display: flex;
-  align-items: center;
 }
 .goal-link {
   color: var(--color-primary);
@@ -415,6 +422,9 @@ section.shared-goals {
   font-weight: 500;
 }
 .meta-date {
+  color: var(--color-secondary);
+}
+.meta-divider {
   color: var(--color-secondary);
 }
 .inactive {
@@ -467,31 +477,51 @@ section.shared-goals {
 .user-collapsible {
   margin-bottom: 1.2rem;
   background: #f9fafb;
+  border-radius: 12px;
+  overflow: hidden;
 }
 .user-header {
   display: flex;
   align-items: center;
   cursor: pointer;
-  padding: 1.1rem 1.2rem 1.1rem 1.2rem;
+  padding: 1.1rem 1.2rem;
   font-size: 1.15rem;
   font-weight: 600;
-  color: var(--color-primary);
   background: var(--color-primary-light);
-  transition: background 0.18s;
+  transition: background 0.3s ease, color 0.3s ease;
 }
+.user-header:hover {
+  background: #fff0db;
+}
+
+.user-header:hover .user-name {
+  color: var(--color-accent);
+}
+
+.user-header:hover .collapse-arrow {
+  color: var(--color-accent);
+}
+
 .user-name {
   flex: 1;
   font-size: 1.15rem;
   font-weight: 600;
   color: var(--color-primary);
+  transition: color 0.3s ease;
 }
 .collapse-arrow {
   font-size: 1.2rem;
   margin-left: 0.7rem;
   color: var(--color-primary);
   font-weight: 700;
+  transition: color 0.3s ease;
 }
-
+.user-goal-list {
+  list-style: none;
+  padding: 0 1.2rem 1rem 1.2rem;
+  margin: 0;
+  background: white;
+}
 .saving-overlay {
   position: fixed;
   top: 0;

@@ -84,11 +84,11 @@
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label>Title</label>
+            <label>Title <span class="required">*</span></label>
             <input v-model="newMilestone.title" type="text" placeholder="e.g., First 5K Together" />
           </div>
           <div class="form-group">
-            <label>Description</label>
+            <label>Description <span class="required">*</span></label>
             <textarea v-model="newMilestone.description" rows="3" placeholder="Describe this milestone..."></textarea>
           </div>
           <div class="form-group">
@@ -780,6 +780,13 @@ watch(selectedMapId, async (newMapId) => {
   }
 });
 
+// Watch for image URLs being loaded and update markers
+watch(imageUrls, () => {
+  if (map && milestones.value.length > 0) {
+    updateMapMarkers();
+  }
+}, { deep: true });
+
 onMounted(async () => {
   await loadMaps();
   await loadPartners();
@@ -1261,5 +1268,10 @@ onMounted(async () => {
 
 .full-image-modal .close-button:hover {
   background: rgba(0, 0, 0, 0.8);
+}
+
+.required {
+  color: var(--color-error);
+  margin-left: 0.25rem;
 }
 </style>
