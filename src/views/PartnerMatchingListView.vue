@@ -14,6 +14,13 @@
     <template v-else>
       <div class="partner-filters">
         <div class="filter-group">
+          <label for="level-filter" class="filter-label">Running Level:</label>
+          <select id="level-filter" v-model="levelFilter" class="filter-dropdown">
+            <option value="all">All</option>
+            <option v-for="level in levelOptions" :key="level" :value="level">{{ level.charAt(0).toUpperCase() + level.slice(1) }}</option>
+          </select>
+        </div>
+        <div class="filter-group">
           <label for="location-filter" class="filter-label">Location:</label>
           <select id="location-filter" v-model="locationFilter" class="filter-dropdown">
             <option value="all">All</option>
@@ -34,7 +41,7 @@
           Please complete your profile with running level and pace to see matching partners.
         </p>
         <p v-else>
-          No users found matching your criteria (level: {{ profileStore.profile.tags.runningLevel }}, pace: {{ profileStore.profile.tags.runningPace }}). Try adjusting your filters or check back later!
+          No users found matching your criteria (pace: {{ profileStore.profile.tags.runningPace }}). Try adjusting your filters or check back later!
         </p>
       </div>
       
@@ -111,6 +118,7 @@ const profiles = ref([])
 
 const locationFilter = ref('all')
 const genderFilter = ref('all')
+const levelFilter = ref('all')
 
 // Dynamic filter options
 const locationOptions = computed(() => {
@@ -128,6 +136,11 @@ const genderOptions = computed(() => {
   if (arr.includes('man')) result.push('man')
   if (hasOther) result.push('other')
   return result
+})
+const levelOptions = computed(() => {
+  const set = new Set()
+  profiles.value.forEach(p => p.tags?.runningLevel && set.add(p.tags.runningLevel))
+  return Array.from(set).sort()
 })
 
 // Helper function to parse pace string (e.g., "8:30") to total seconds
@@ -169,11 +182,10 @@ function matchesTimeOfDayCategory(currentUserTime: string | undefined, partnerTi
   return partnerTimeCategory === 'All Times' || partnerTimeCategory === currentTime
 }
 
-// Filtered profiles (excluding current user, matching level and pace)
+// Filtered profiles (excluding current user, matching pace and user-selected filters)
 const filteredProfiles = computed(() => {
   const currentUserId = authStore.user?.id
   const currentUserProfile = profileStore.profile
-  const currentUserLevel = currentUserProfile.tags?.runningLevel
   const currentUserPace = currentUserProfile.tags?.runningPace
   
   return profiles.value.filter(p => {
@@ -185,12 +197,8 @@ const filteredProfiles = computed(() => {
     // Location filter
     const locMatch = locationFilter.value === 'all' || p.location === locationFilter.value
     
-    // Level filter - automatically matches current user's level (if user has a level set)
-    let levelMatch = true
-    if (currentUserLevel) {
-      // Auto-filter to match user's level
-      levelMatch = p.tags?.runningLevel === currentUserLevel
-    }
+    // Level filter - user-controlled filter
+    const levelMatch = levelFilter.value === 'all' || p.tags?.runningLevel === levelFilter.value
     
     // Pace filter - must be within 1:00 min (60 seconds) of current user's pace (if user has a pace set)
     let paceMatch = true
