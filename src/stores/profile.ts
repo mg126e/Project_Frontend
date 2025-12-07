@@ -16,6 +16,7 @@ interface UserProfile {
   location?: string;
   emergencyContact?: EmergencyContact;
   tags?: Record<string, string | number>;
+  timeOfDayCategory?: "All Times" | "Morning (5am - 12pm)" | "Afternoon (12pm - 5pm)" | "Evening (5pm - 9pm)" | "Night (9pm - 5am)";
   isActive?: boolean;
 }
 
@@ -29,6 +30,7 @@ export const useProfileStore = defineStore('profile', () => {
     bio: '',
     location: '',
     emergencyContact: { name: '', phone: '' },
+    timeOfDayCategory: 'All Times',
     tags: {
       gender: '',
       age: '',
@@ -78,6 +80,7 @@ export const useProfileStore = defineStore('profile', () => {
     bio: '',
     location: '',
     emergencyContact: { name: '', phone: '' },
+    timeOfDayCategory: 'All Times',
     tags: {
       gender: '',
       age: '',
@@ -118,13 +121,20 @@ export const useProfileStore = defineStore('profile', () => {
     if ('genderOther' in tags) {
       delete tags.genderOther;
     }
+    // Handle timeOfDayCategory - only default if truly undefined/null/empty
+    const timeOfDayCategory = (partial.timeOfDayCategory && partial.timeOfDayCategory.trim() !== '')
+      ? partial.timeOfDayCategory
+      : 'All Times';
+    
     const merged = {
       ...defaultProfile,
       ...partial,
       profileImage,
       emergencyContact: { name, phone },
-      tags
+      tags,
+      timeOfDayCategory
     };
+    console.log('[mergeProfile] Merged timeOfDayCategory:', timeOfDayCategory, 'from partial:', partial.timeOfDayCategory);
     return merged;
   }
 
@@ -299,6 +309,58 @@ export const useProfileStore = defineStore('profile', () => {
       loading.value = false;
     }
   }
+
+  async function updateTimeOfDayCategory(timeOfDayCategory: string): Promise<void> {
+    // Default to "All Times" if not provided (use nullish coalescing)
+    const category = timeOfDayCategory ?? 'All Times';
+    console.log('[updateTimeOfDayCategory] Calling API with category:', category);
+    loading.value = true;
+    error.value = '';
+    try {
+      const session = getSession();
+      if (!session) throw new Error('Session not found');
+      console.log('[updateTimeOfDayCategory] Session:', session ? 'present' : 'missing');
+      const payload = { session, timeOfDayCategory: category };
+      console.log('[updateTimeOfDayCategory] Payload:', payload);
+      const result = await ApiService.callConceptAction('UserProfile', 'setTimeOfDayCategory', payload);
+      console.log('[updateTimeOfDayCategory] API response:', result);
+      // Check for errors in different response structures
+      if (result && typeof result === 'object') {
+        // Check if error is directly in result
+        if ('error' in result && result.error) {
+          const errorMsg = typeof result.error === 'string' ? result.error : String(result.error);
+          error.value = errorMsg;
+          console.error('[updateTimeOfDayCategory] Error in response:', errorMsg);
+          throw new Error(errorMsg);
+        }
+        // Check if error is in result.msg
+        if (result.msg && typeof result.msg === 'object' && 'error' in result.msg) {
+          const errorMsg = typeof result.msg.error === 'string' ? result.msg.error : String(result.msg.error);
+          error.value = errorMsg;
+          console.error('[updateTimeOfDayCategory] Error in msg:', errorMsg);
+          throw new Error(errorMsg);
+        }
+      }
+    } catch (e: any) {
+      console.error('[updateTimeOfDayCategory] Caught error:', e);
+      // Check if it's an axios error with response data
+      if (e?.response?.data) {
+        const errorData = e.response.data;
+        if (errorData.error) {
+          error.value = typeof errorData.error === 'string' ? errorData.error : String(errorData.error);
+        } else if (errorData.msg?.error) {
+          error.value = typeof errorData.msg.error === 'string' ? errorData.msg.error : String(errorData.msg.error);
+        } else {
+          error.value = e instanceof Error ? e.message : 'Failed to update time of day category.';
+        }
+      } else {
+        error.value = e instanceof Error ? e.message : 'Failed to update time of day category.';
+      }
+      throw e;
+    } finally {
+      loading.value = false;
+    }
+  }
   async function setIsActive(isActive: boolean): Promise<void> {
     loading.value = true;
     error.value = '';
@@ -360,6 +422,11 @@ export const useProfileStore = defineStore('profile', () => {
       await updateLocation(newProfile.location || '');
       const ec = newProfile.emergencyContact || { name: '', phone: '' };
       await updateEmergencyContact(ec.name || '', ec.phone || '');
+      // Update timeOfDayCategory (default to "All Times" if not provided)
+      // Use nullish coalescing to only default for undefined/null, not empty strings
+      const timeOfDayCategory = newProfile.timeOfDayCategory ?? 'All Times';
+      console.log('[batchUpdateProfile] Updating timeOfDayCategory:', timeOfDayCategory, 'from payload:', newProfile.timeOfDayCategory);
+      await updateTimeOfDayCategory(timeOfDayCategory);
       const tags = newProfile.tags || {};
       for (const tagType of ['gender', 'age', 'runningLevel', 'runningPace', 'personality']) {
         if (tags[tagType]) {

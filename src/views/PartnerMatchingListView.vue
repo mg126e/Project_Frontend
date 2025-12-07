@@ -21,13 +21,6 @@
           </select>
         </div>
         <div class="filter-group">
-          <label for="level-filter" class="filter-label">Level:</label>
-          <select id="level-filter" v-model="levelFilter" class="filter-dropdown">
-            <option value="all">All</option>
-            <option v-for="lvl in levelOptions" :key="lvl" :value="lvl">{{ lvl.charAt(0).toUpperCase() + lvl.slice(1) }}</option>
-          </select>
-        </div>
-        <div class="filter-group">
           <label for="gender-filter" class="filter-label">Gender:</label>
           <select id="gender-filter" v-model="genderFilter" class="filter-dropdown">
             <option value="all">All</option>
@@ -37,7 +30,12 @@
       </div>
       
       <div v-if="filteredProfiles.length === 0 && !loading" class="empty-state">
-        <p>No users found in your area. Try adjusting your filters or check back later!</p>
+        <p v-if="!profileStore.profile.tags?.runningLevel || !profileStore.profile.tags?.runningPace">
+          Please complete your profile with running level and pace to see matching partners.
+        </p>
+        <p v-else>
+          No users found matching your criteria (level: {{ profileStore.profile.tags.runningLevel }}, pace: {{ profileStore.profile.tags.runningPace }}). Try adjusting your filters or check back later!
+        </p>
       </div>
       
       <div v-else class="profiles-list">
@@ -52,9 +50,9 @@
     
     <ConfirmActionModal
       v-if="showInviteModal"
-      :title="'Send Invite'"
+      :title="'Send Request'"
       :message="inviteModalMessage"
-      confirmText="Send Invite"
+      confirmText="Send Request"
       confirmClass="accent"
       @close="showInviteModal = false"
       @confirm="confirmSendInvite"
@@ -112,18 +110,12 @@ function confirmSendInvite() {
 const profiles = ref([])
 
 const locationFilter = ref('all')
-const levelFilter = ref('all')
 const genderFilter = ref('all')
 
 // Dynamic filter options
 const locationOptions = computed(() => {
   const set = new Set()
   profiles.value.forEach(p => p.location && set.add(p.location))
-  return Array.from(set)
-})
-const levelOptions = computed(() => {
-  const set = new Set()
-  profiles.value.forEach(p => p.tags?.runningLevel && set.add(p.tags.runningLevel))
   return Array.from(set)
 })
 const genderOptions = computed(() => {
@@ -138,23 +130,87 @@ const genderOptions = computed(() => {
   return result
 })
 
-// Filtered profiles (excluding current user)
+// Helper function to parse pace string (e.g., "8:30") to total seconds
+function parsePaceToSeconds(paceString: string): number | null {
+  if (!paceString) return null
+  const parts = paceString.split(':')
+  if (parts.length !== 2) return null
+  const minutes = parseInt(parts[0], 10)
+  const seconds = parseInt(parts[1], 10)
+  if (isNaN(minutes) || isNaN(seconds)) return null
+  return minutes * 60 + seconds
+}
+
+// Helper function to check if two paces are within 1:00 min (60 seconds)
+function pacesWithinRange(pace1: string, pace2: string): boolean {
+  const seconds1 = parsePaceToSeconds(pace1)
+  const seconds2 = parsePaceToSeconds(pace2)
+  if (seconds1 === null || seconds2 === null) return false
+  return Math.abs(seconds1 - seconds2) <= 60
+}
+
+// Helper function to check if time of day matches based on timeOfDayCategory
+// Rules:
+// - If current user has "All Times", match everyone
+// - If current user has a specific time, only match users with "All Times" or the exact same time
+function matchesTimeOfDayCategory(currentUserTime: string | undefined, partnerTime: string | undefined): boolean {
+  // Default to "All Times" if not set
+  const currentTime = currentUserTime || 'All Times'
+  const partnerTimeCategory = partnerTime || 'All Times'
+  
+  // If current user has "All Times", they match with everyone
+  if (currentTime === 'All Times') {
+    return true
+  }
+  
+  // If current user has a specific time, only match:
+  // 1. Partners with "All Times" (flexible)
+  // 2. Partners with the exact same time
+  return partnerTimeCategory === 'All Times' || partnerTimeCategory === currentTime
+}
+
+// Filtered profiles (excluding current user, matching level and pace)
 const filteredProfiles = computed(() => {
   const currentUserId = authStore.user?.id
+  const currentUserProfile = profileStore.profile
+  const currentUserLevel = currentUserProfile.tags?.runningLevel
+  const currentUserPace = currentUserProfile.tags?.runningPace
+  
   return profiles.value.filter(p => {
     // Exclude current user
     if (p._id === currentUserId || p.userId === currentUserId) {
       return false
     }
+    
+    // Location filter
     const locMatch = locationFilter.value === 'all' || p.location === locationFilter.value
-    const levelMatch = levelFilter.value === 'all' || p.tags?.runningLevel === levelFilter.value
+    
+    // Level filter - automatically matches current user's level (if user has a level set)
+    let levelMatch = true
+    if (currentUserLevel) {
+      // Auto-filter to match user's level
+      levelMatch = p.tags?.runningLevel === currentUserLevel
+    }
+    
+    // Pace filter - must be within 1:00 min (60 seconds) of current user's pace (if user has a pace set)
+    let paceMatch = true
+    if (currentUserPace && p.tags?.runningPace) {
+      paceMatch = pacesWithinRange(currentUserPace, p.tags.runningPace)
+    }
+    
+    // Gender filter
     let genderMatch = true
     if (genderFilter.value === 'woman' || genderFilter.value === 'man') {
       genderMatch = p.tags?.gender === genderFilter.value
     } else if (genderFilter.value === 'other') {
       genderMatch = p.tags?.gender !== 'woman' && p.tags?.gender !== 'man'
     }
-    return locMatch && levelMatch && genderMatch
+    
+    // Time of day filter - automatically matches based on current user's timeOfDayCategory
+    const currentUserTime = currentUserProfile.timeOfDayCategory || 'All Times'
+    const timeMatch = matchesTimeOfDayCategory(currentUserTime, p.timeOfDayCategory)
+    
+    return locMatch && levelMatch && paceMatch && genderMatch && timeMatch
   })
 })
 
@@ -349,6 +405,13 @@ onMounted(() => {
   background: #F9FAFB;
   border-radius: 24px;
   padding: 3.5rem 4.5rem 3.5rem 4.5rem;
+}
+
+.page-description {
+  color: var(--color-secondary);
+  font-size: 1rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
 }
 .profiles-list {
   display: grid;

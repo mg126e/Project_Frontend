@@ -4,7 +4,7 @@
   </div>
   <div v-else class="dashboard-home">
     <h1 class="fade-in">{{ greeting }}{{ displayName ? `, ${displayName}` : '' }}!</h1>
-    <p v-if="welcomeMessageVisible" class="dashboard-welcome-msg fade-in">{{ stats.matches === 0 ? 'Ready to get started?' : 'Ready to continue your great work?' }}</p>
+    <p v-if="welcomeMessageVisible && stats.matches === 0" class="dashboard-welcome-msg fade-in">Ready to get started?</p>
     <div class="dashboard-stats">
       <div class="stat-card" :class="{ 'card-visible': cardsVisible }" style="animation-delay: 0.1s">
         <div class="stat-label">Matches</div>
@@ -22,14 +22,14 @@
       </div>
     </div>
 
-    <!-- Active Runs Section -->
+    <!-- Upcoming Runs Section -->
     <div v-if="activeRuns.length > 0" class="active-runs-section" :class="{ 'section-visible': cardsVisible }">
-      <h2 class="section-title">Active Runs</h2>
+      <h2 class="section-title">Upcoming Runs</h2>
       <div class="runs-grid">
         <div v-for="run in activeRuns" :key="run._id" class="run-card-dashboard">
           <div class="run-card-content">
-            <h3>Run with Partner</h3>
-            <p class="run-card-subtitle">Scheduled run in progress</p>
+            <h3>Run with {{ getPartnerName(run._id) || 'Partner' }}</h3>
+            <p class="run-card-subtitle">{{ getRunDateTime(run._id) || 'Loading...' }}</p>
           </div>
           <div class="run-card-actions">
             <router-link :to="`/run/${run._id}`" class="btn-view-run">View Details</router-link>
@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useProfileStore } from '../stores/profile';
 import { useSharedGoalsStore } from '../stores/sharedGoals';
@@ -134,12 +134,144 @@ async function fetchMatches() {
 
 const activeRuns = computed(() => oneRunStore.activeRuns);
 
+// Store partner names by run ID
+const partnerNames = ref<Record<string, string>>({});
+
+// Store run dates by run ID
+const runDates = ref<Record<string, string>>({});
+
+// Get partner's user ID from run
+function getPartnerId(run: { userA: string; userB: string }): string | null {
+  const currentUserId = auth.user?.id;
+  if (!currentUserId) return null;
+  
+  if (run.userA === currentUserId) {
+    return run.userB;
+  } else if (run.userB === currentUserId) {
+    return run.userA;
+  }
+  return null;
+}
+
+// Fetch partner's display name
+async function fetchPartnerName(runId: string, partnerId: string) {
+  try {
+    const result = await ApiService.callConceptAction<{ displayname: string } | { error: string }>(
+      'UserProfile',
+      '_getDisplayName',
+      { user: partnerId }
+    );
+    
+    if (result && 'displayname' in result) {
+      partnerNames.value[runId] = result.displayname;
+    } else if (result && 'error' in result) {
+      // Fallback to username if displayname fails
+      try {
+        const usernameResult = await ApiService.callConceptAction<{ username: string } | { error: string }>(
+          'PasswordAuthentication',
+          '_getUsername',
+          { user: partnerId }
+        );
+        if (usernameResult && 'username' in usernameResult) {
+          partnerNames.value[runId] = usernameResult.username;
+        }
+      } catch (e) {
+        console.warn('Failed to fetch username for partner:', e);
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to fetch partner name:', e);
+  }
+}
+
+// Get partner name for display
+function getPartnerName(runId: string): string {
+  return partnerNames.value[runId] || '';
+}
+
+// Format date for display
+function formatDate(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+// Get run date/time for display
+function getRunDateTime(runId: string): string {
+  return runDates.value[runId] || '';
+}
+
+// Fetch invite for a run to get the start date
+async function fetchRunDate(runId: string, run: { userA: string; userB: string }) {
+  try {
+    // Try to find the invite for this run
+    const invite = await oneRunStore.findInviteForRun(run);
+    
+    if (invite && invite.start) {
+      // Handle nested invite structure if needed
+      const inviteData = ('invite' in invite && invite.invite) ? invite.invite : invite;
+      if (inviteData.start) {
+        runDates.value[runId] = formatDate(inviteData.start);
+      }
+    } else {
+      // If no invite found, try fetching run with invite
+      const result = await oneRunStore.fetchRunWithInvite(runId);
+      if (result?.invite?.start) {
+        runDates.value[runId] = formatDate(result.invite.start);
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to fetch run date:', e);
+  }
+}
+
+// Fetch partner names for all active runs
+async function fetchAllPartnerNames() {
+  if (!auth.user?.id) return;
+  
+  const promises = activeRuns.value.map(async (run) => {
+    const partnerId = getPartnerId(run);
+    if (partnerId && !partnerNames.value[run._id]) {
+      await fetchPartnerName(run._id, partnerId);
+    }
+  });
+  
+  await Promise.allSettled(promises);
+}
+
+// Fetch run dates for all active runs
+async function fetchAllRunDates() {
+  const promises = activeRuns.value.map(async (run) => {
+    if (!runDates.value[run._id]) {
+      await fetchRunDate(run._id, run);
+    }
+  });
+  
+  await Promise.allSettled(promises);
+}
+
 onMounted(async () => {
   await profileStore.fetchProfile();
   await sharedGoalsStore.fetchAllSharedGoalsForUser();
   await fetchMatches();
   // Fetch runs to populate active runs
   await oneRunStore.fetchMatches();
+  
+  // Fetch partner names and dates after runs are loaded
+  await Promise.all([
+    fetchAllPartnerNames(),
+    fetchAllRunDates()
+  ]);
   
   stats.value.goals = sharedGoalsStore.sharedGoals.length;
 
@@ -151,6 +283,14 @@ onMounted(async () => {
     animateNumber('matches', stats.value.matches);
   }, 100);
 });
+
+// Watch for changes in active runs and fetch partner names and dates
+watch(activeRuns, async () => {
+  await Promise.all([
+    fetchAllPartnerNames(),
+    fetchAllRunDates()
+  ]);
+}, { immediate: false });
 </script>
 
 <style scoped>
@@ -270,7 +410,7 @@ onMounted(async () => {
   100% { transform: rotate(360deg); }
 }
 
-/* Active Runs Section */
+/* Upcoming Runs Section */
 .active-runs-section {
   margin-top: 3rem;
   opacity: 0;
@@ -287,7 +427,7 @@ onMounted(async () => {
   color: var(--color-primary);
   font-size: 1.8rem;
   margin-bottom: 1.5rem;
-  text-align: left;
+  text-align: center;
   font-weight: 600;
 }
 

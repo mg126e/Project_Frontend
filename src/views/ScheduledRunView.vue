@@ -68,7 +68,7 @@
           {{ loadingThread ? 'Loading...' : 'Message Partner' }}
         </button>
         <button 
-          v-if="!run.completed" 
+          v-if="!run.completed && canCompleteRun" 
           @click="handleCompleteRun" 
           class="btn-complete"
           :disabled="completingRun"
@@ -120,6 +120,22 @@ const currentUserId = computed(() => authStore.user?.id || '')
 const otherUserId = computed(() => {
   if (!run.value || !currentUserId.value) return null
   return run.value.userA === currentUserId.value ? run.value.userB : run.value.userA
+})
+
+// Check if the run date is today or has passed (can complete run)
+const canCompleteRun = computed(() => {
+  if (!invite.value || !invite.value.start) return false
+  try {
+    const runDate = new Date(invite.value.start)
+    const now = new Date()
+    // Set both to start of day for comparison
+    const runDateOnly = new Date(runDate.getFullYear(), runDate.getMonth(), runDate.getDate())
+    const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    // Allow completion if it's the same day or later
+    return todayOnly >= runDateOnly
+  } catch {
+    return false
+  }
 })
 
 function formatDate(dateString: string): string {
@@ -283,6 +299,12 @@ async function fetchUserNames(userAId: string, userBId: string) {
 
 async function handleCompleteRun() {
   if (!run.value || completingRun.value) return
+  
+  // Check if run date has passed
+  if (!canCompleteRun.value) {
+    alert('Cannot complete run until after the scheduled date and time.')
+    return
+  }
   
   if (!confirm('Mark this run as completed?')) return
   

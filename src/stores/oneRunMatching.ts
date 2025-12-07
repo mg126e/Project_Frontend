@@ -101,7 +101,7 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
       await fetchUserInvites()
       return { success: true }
     } catch (e) {
-      const errMsg = e instanceof Error ? e.message : 'Failed to send invite'
+      const errMsg = e instanceof Error ? e.message : 'Failed to send request'
       error.value = errMsg
       return { success: false, error: errMsg }
     } finally {

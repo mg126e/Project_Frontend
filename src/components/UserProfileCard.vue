@@ -20,7 +20,7 @@
         <span class="tag">{{ profile.tags.runningPace }} min/mi</span>
         <span class="tag">{{ profile.tags.personality }}</span>
       </div>
-      <button class="btn-primary" @click="$emit('send-invite', profile)">Send Invite</button>
+      <button class="btn-primary" @click="$emit('send-invite', profile)">Send Request</button>
     </div>
   </div>
 </template>
@@ -46,10 +46,14 @@ const profileImageUrl = computed(() => {
   background: #f7fafd;
   border-radius: 20px;
   padding: 2.5rem 2.7rem;
-  min-width: 340px;
-  max-width: 440px;
+  width: 100%;
+  max-width: 100%;
   gap: 2.2rem;
   border: 1.5px solid var(--color-primary-border);
+  box-sizing: border-box;
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 .profile-card:hover {
   border: 1.5px solid var(--color-primary);
@@ -57,10 +61,11 @@ const profileImageUrl = computed(() => {
 .profile-avatar {
   width: 100px;
   height: 100px;
+  min-width: 100px;
+  flex-shrink: 0;
   border-radius: 50%;
   object-fit: cover;
   border: 3px solid var(--color-primary);
-  margin-right: 1.7rem;
   background: #F9FAFB;
 }
 .profile-info {
@@ -68,6 +73,47 @@ const profileImageUrl = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
+  min-width: 0;
+  overflow: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+.profile-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  overflow: hidden;
+}
+.profile-name {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+  max-width: 100%;
+}
+.profile-bio {
+  margin: 0 0 1.1rem 0;
+  color: #555;
+  font-size: 1.05rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-height: 1.4;
+  max-width: 100%;
 }
 .profile-meta {
   color: #888;
@@ -75,6 +121,10 @@ const profileImageUrl = computed(() => {
   margin-bottom: 0.2rem;
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 .meta-label {
   font-weight: 600;
@@ -85,6 +135,7 @@ const profileImageUrl = computed(() => {
   flex-wrap: wrap;
   gap: 0.6rem;
   margin-bottom: 0.7rem;
+  max-width: 100%;
 }
 .tag {
   background: var(--color-primary-light);
@@ -93,6 +144,12 @@ const profileImageUrl = computed(() => {
   padding: 0.22em 0.9em;
   font-size: 0.98rem;
   font-weight: 600;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .profile-emergency {
   color: #b23b3b;

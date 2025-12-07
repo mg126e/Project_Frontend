@@ -71,7 +71,7 @@
         <div class="form-actions">
           <button type="submit" class="btn-primary" :disabled="creatingInvite || !canCreateInvite">
             <span v-if="creatingInvite">Creating & Sending...</span>
-            <span v-else>Create & Send Invite</span>
+            <span v-else>Create & Send Request</span>
           </button>
         </div>
       </form>
@@ -98,7 +98,7 @@
           </div>
           <div class="invite-actions">
             <button v-if="!invite.sent" @click="handleSendInvite(invite._id)" class="btn-send" :disabled="sendingInvite === invite._id">
-              {{ sendingInvite === invite._id ? 'Sending...' : 'Send Invite' }}
+              {{ sendingInvite === invite._id ? 'Sending...' : 'Send Request' }}
             </button>
             <button v-if="!invite.sent" @click="handleDeleteInvite(invite._id)" class="btn-delete">Delete</button>
             <button v-if="invite.sent && invite.acceptanceStatus === 'pending'" @click="handleDeleteInvite(invite._id)" class="btn-cancel">
@@ -148,7 +148,13 @@
           </div>
           <div class="run-actions">
             <router-link :to="`/run/${run._id}`" class="btn-view">View Details</router-link>
-            <button @click="handleCompleteRun(run._id)" class="btn-complete">Complete Run</button>
+            <button 
+              v-if="canCompleteRun(run._id)"
+              @click="handleCompleteRun(run._id)" 
+              class="btn-complete"
+            >
+              Complete Run
+            </button>
             <button @click="handleCancelRun(run._id)" class="btn-cancel">Cancel Run</button>
           </div>
         </div>
@@ -220,6 +226,7 @@ const canCreateInvite = computed(() => {
   )
 })
 const activeRuns = computed(() => oneRunStore.activeRuns)
+const invites = computed(() => oneRunStore.invites)
 
 // Helper function to extract state from location (e.g., "Boston, MA" -> "MA")
 // This ensures we match by state, not exact city and state
@@ -335,7 +342,49 @@ async function handleDeclineInvite(inviteId: string) {
   }
 }
 
+// Check if a run can be completed (date has passed)
+function canCompleteRun(runId: string): boolean {
+  // Find the invite associated with this run
+  const run = activeRuns.value.find(r => r._id === runId)
+  if (!run) return false
+  
+  // Try to find invite in the invites array
+  // Check for accepted invites that match the run's users
+  const associatedInvite = invites.value.find(inv => {
+    if (inv.acceptanceStatus !== 'accepted') return false
+    // Check if invite matches the run's users
+    return (inv.inviter === run.userA && inv.invitees.includes(run.userB)) ||
+           (inv.inviter === run.userB && inv.invitees.includes(run.userA)) ||
+           (inv.inviter === run.userA && inv.inviter === run.userB) // Same user (shouldn't happen but handle it)
+  })
+  
+  if (!associatedInvite || !associatedInvite.start) {
+    // If invite not found locally, be conservative and allow completion
+    // (The invite might not be loaded yet, but we don't want to block users unnecessarily)
+    return true
+  }
+  
+  try {
+    const runDate = new Date(associatedInvite.start)
+    const now = new Date()
+    // Set both to start of day for comparison
+    const runDateOnly = new Date(runDate.getFullYear(), runDate.getMonth(), runDate.getDate())
+    const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    // Allow completion if it's the same day or later
+    return todayOnly >= runDateOnly
+  } catch {
+    // If date parsing fails, don't show button to be safe
+    return false
+  }
+}
+
 async function handleCompleteRun(runId: string) {
+  // Check if run date has passed
+  if (!canCompleteRun(runId)) {
+    alert('Cannot complete run until after the scheduled date and time.')
+    return
+  }
+  
   if (!confirm('Mark this run as completed?')) return
   const result = await oneRunStore.completeRun(runId)
   if (!result.success && result.error) {

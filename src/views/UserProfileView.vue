@@ -81,6 +81,16 @@
               <span v-if="paceInputError" class="error-msg">Running pace must be in correct format (e.g. 8:30)</span>
           </div>
           <div>
+            <label>Preferred Time of Day <span class="required-star">*</span></label>
+            <select v-model="editForm.timeOfDayCategory" required>
+              <option value="All Times">All Times</option>
+              <option value="Morning (5am - 12pm)">Morning (5am - 12pm)</option>
+              <option value="Afternoon (12pm - 5pm)">Afternoon (12pm - 5pm)</option>
+              <option value="Evening (5pm - 9pm)">Evening (5pm - 9pm)</option>
+              <option value="Night (9pm - 5am)">Night (9pm - 5am)</option>
+            </select>
+          </div>
+          <div>
             <label>Personality <span class="required-star">*</span></label>
             <select v-model="editForm.tags.personality" required>
               <option value="">Select</option>
@@ -109,6 +119,7 @@
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Running Level</span><span class="profile-value">{{ profile.tags.runningLevel }}</span></div>
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Running Pace</span><span class="profile-value">{{ profile.tags.runningPace }}</span></div>
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Personality</span><span class="profile-value">{{ profile.tags.personality }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Preferred Time of Day</span><span class="profile-value">{{ profile.timeOfDayCategory || 'All Times' }}</span></div>
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Location</span><span class="profile-value">{{ profile.location }}</span></div>
         </div>
         <div class="profile-view-avatar-large">
@@ -162,13 +173,15 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import ChangePasswordModal from '../components/ChangePasswordModal.vue';
 import ConfirmActionModal from '../components/ConfirmActionModal.vue';
 import { useProfileStore } from '../stores/profile';
 import { storeToRefs } from 'pinia';
+
+type TimeOfDayCategory = "All Times" | "Morning (5am - 12pm)" | "Afternoon (12pm - 5pm)" | "Evening (5pm - 9pm)" | "Night (9pm - 5am)" | '';
 
 const auth = useAuthStore();
 const profileStore = useProfileStore();
@@ -193,6 +206,7 @@ const editForm = ref({
   bio: '',
   location: '',
   emergencyContact: { name: '', phone: '' },
+  timeOfDayCategory: 'All Times' as TimeOfDayCategory,
   tags: {
     gender: '',
     genderOther: '',
@@ -271,6 +285,7 @@ function startEdit() {
     profileImage: p.profileImage || '',
     bio: p.bio || '',
     location: p.location || '',
+    timeOfDayCategory: (p.timeOfDayCategory || 'All Times') as TimeOfDayCategory,
     emergencyContact: { ...defaultEC, ...(p.emergencyContact || {}) },
     tags: { ...defaultTags, ...(p.tags || {}) }
   };
@@ -294,6 +309,7 @@ function cancelEdit() {
     profileImage: p.profileImage || '',
     bio: p.bio || '',
     location: p.location || '',
+    timeOfDayCategory: (p.timeOfDayCategory || 'All Times') as TimeOfDayCategory,
     emergencyContact: { ...defaultEC, ...(p.emergencyContact || {}) },
     tags: { ...defaultTags, ...(p.tags || {}) }
   };
@@ -447,14 +463,22 @@ async function saveProfile() {
   }
   // Remove genderOther from tags before saving
   const { genderOther, ...tagsWithoutGenderOther } = tags;
+  // Ensure timeOfDayCategory has a value - default if undefined/null/empty
+  const timeOfDayValue = (p.timeOfDayCategory && p.timeOfDayCategory.trim() !== '') 
+    ? p.timeOfDayCategory 
+    : 'All Times';
+  
   const payload = {
     displayname: p.displayname,
     bio: p.bio,
     location: p.location,
+    timeOfDayCategory: timeOfDayValue,
     emergencyContact: { name: ec.name, phone: ec.phone },
     tags: { ...tagsWithoutGenderOther, gender: genderValue },
     profileImage: p.profileImage
   };
+  
+  console.log('[saveProfile] Saving timeOfDayCategory:', timeOfDayValue, 'from form value:', p.timeOfDayCategory);
   savingProfile.value = true;
   try {
     await profileStore.batchUpdateProfile(payload);
@@ -462,7 +486,9 @@ async function saveProfile() {
     await profileStore.fetchProfile();
     isEditMode.value = false;
   } catch (e) {
-    alert('Failed to save profile.');
+    const errorMsg = e instanceof Error ? e.message : 'Failed to save profile.';
+    console.error('[saveProfile] Error saving profile:', e);
+    alert(`Failed to save profile: ${errorMsg}`);
   } finally {
     savingProfile.value = false;
   }
