@@ -195,8 +195,7 @@ L.Icon.Default.mergeOptions({
 
 interface MilestoneMap {
   id: string;
-  partnerA: string;
-  partnerB: string;
+  users: string[];
   createdAt: string;
   isActive: boolean;
 }
@@ -268,7 +267,8 @@ const canAddMilestone = computed(() => {
 
 function getPartnerName(mapData: MilestoneMap): string {
   const currentUserId = auth.user?.id;
-  const partnerId = mapData.partnerA === currentUserId ? mapData.partnerB : mapData.partnerA;
+  const partnerId = mapData.users.find(userId => userId !== currentUserId);
+  if (!partnerId) return 'Unknown Partner';
   return mapPartnerNames.value[partnerId] || `Partner ${partnerId.substring(0, 8)}`;
 }
 
@@ -384,8 +384,8 @@ async function loadMaps() {
     
     // Fetch partner names for map selector
     const uniquePartners = [...new Set(
-      maps.value.map(map => 
-        map.partnerA === auth.user!.id ? map.partnerB : map.partnerA
+      maps.value.flatMap(map => 
+        map.users.filter(userId => userId !== auth.user!.id)
       )
     )];
     
@@ -624,7 +624,7 @@ function promptRemoveMilestone(milestoneId: string) {
 }
 
 async function confirmRemoveMilestone() {
-  if (!milestoneToRemove.value) return;
+  if (!milestoneToRemove.value || !auth.user?.id) return;
 
   try {
     await ApiService.callConceptAction(
@@ -742,8 +742,7 @@ async function createNewMap() {
 
   // Check if a map already exists with this partner
   const existingMap = maps.value.find(map => 
-    (map.partnerA === auth.user!.id && map.partnerB === selectedPartner.value) ||
-    (map.partnerB === auth.user!.id && map.partnerA === selectedPartner.value)
+    map.users.includes(auth.user!.id) && map.users.includes(selectedPartner.value!)
   );
 
   if (existingMap) {
@@ -759,12 +758,19 @@ async function createNewMap() {
       'MilestoneMap',
       'createMilestoneMap',
       {
-        userB: selectedPartner.value,
+        users: [auth.user.id, selectedPartner.value],
       }
     );
 
     closeCreateMapModal();
     await loadMaps();
+    
+    // Initialize map if this is the first map
+    await nextTick();
+    if (!map && maps.value.length > 0) {
+      await initMap();
+      await loadMilestones();
+    }
   } catch (e: any) {
     createMapError.value = e.message || 'Failed to create milestone map';
   } finally {
