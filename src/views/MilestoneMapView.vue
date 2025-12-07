@@ -599,12 +599,11 @@ async function addMilestone() {
       'MilestoneMap',
       'addMilestone',
       {
-        milestoneMap: selectedMapId.value,
+        milestoneMapId: selectedMapId.value,
         latitude: newMilestone.value.latitude,
         longitude: newMilestone.value.longitude,
         title: newMilestone.value.title,
         description: newMilestone.value.description,
-        addedBy: auth.user!.id,
         ...(photoFileId && { photoFileId }),
       }
     );
@@ -632,8 +631,7 @@ async function confirmRemoveMilestone() {
       'MilestoneMap',
       'removeMilestone',
       {
-        milestone: milestoneToRemove.value,
-        user: auth.user.id,
+        milestoneId: milestoneToRemove.value,
       }
     );
 
@@ -766,6 +764,13 @@ async function createNewMap() {
 
     closeCreateMapModal();
     await loadMaps();
+    
+    // Initialize map if this is the first map
+    await nextTick();
+    if (!map && maps.value.length > 0) {
+      await initMap();
+      await loadMilestones();
+    }
   } catch (e: any) {
     createMapError.value = e.message || 'Failed to create milestone map';
   } finally {
