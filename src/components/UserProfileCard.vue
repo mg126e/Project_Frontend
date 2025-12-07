@@ -20,23 +20,53 @@
         <span class="tag">{{ profile.tags.runningPace }} min/mi</span>
         <span class="tag">{{ profile.tags.personality }}</span>
       </div>
-      <button class="btn-primary" @click="$emit('send-invite', profile)">Send Request</button>
+      <div class="action-buttons">
+        <button 
+          class="thumbs-up-btn" 
+          :class="{ 'selected': hasThumbsUp }"
+          @click="handleThumbsUpClick"
+          :title="hasThumbsUp ? 'Request sent' : 'Send request'"
+        >
+          👍
+        </button>
+        <button
+          v-if="hasMutualMatch"
+          class="chat-btn"
+          @click="handleChatClick"
+          title="Start chatting"
+        >
+          💬 Chat
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps({
   profile: { type: Object, required: true },
+  hasThumbsUp: { type: Boolean, default: false },
+  hasMutualMatch: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['send-invite', 'chat'])
 
 const profileImageUrl = computed(() => {
   return props.profile.profileImage || 
          props.profile.profileImageUrl || 
          'https://media.istockphoto.com/id/628317758/vector/fit-couple-running-a-marathon-together.jpg?s=612x612&w=0&k=20&c=q9adFDtuz7CkLSb-u9U_ykVQdD0aBuWEHbtoCvJ94rQ='
 })
+
+function handleThumbsUpClick() {
+  emit('send-invite', props.profile)
+}
+
+function handleChatClick() {
+  const profileId = props.profile._id || props.profile.userId
+  emit('chat', profileId)
+}
 </script>
 
 <style scoped>
@@ -164,20 +194,56 @@ const profileImageUrl = computed(() => {
   font-weight: 600;
   color: #b23b3b;
 }
-.btn-primary {
-  background: var(--color-accent);
-  color: var(--color-primary);
-  border: none;
-  border-radius: 6px;
-  padding: 0.7em 1.5em;
-  font-weight: 600;
-  font-size: 1.05rem;
+.thumbs-up-btn {
+  background: transparent;
+  border: 2px solid var(--color-primary);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
   cursor: pointer;
-  transition: background 0.2s;
-  color: white;
+  transition: all 0.2s ease;
+  padding: 0;
 }
 
-.btn-primary:hover {
-  background: var(--color-accent-dark);
+.thumbs-up-btn:hover {
+  transform: scale(1.1);
+  border-color: var(--color-accent);
+}
+
+.thumbs-up-btn.selected {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  transform: scale(1.1);
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.chat-btn {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6em 1.2em;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-btn:hover {
+  background: var(--color-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 </style>

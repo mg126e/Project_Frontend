@@ -50,7 +50,10 @@
           v-for="p in filteredProfiles"
           :key="p._id || p.userId"
           :profile="p"
-          @send-invite="openInviteModal"
+          :has-thumbs-up="thumbsUpsSent.has(p._id || p.userId)"
+          :has-mutual-match="hasMutualMatch(p._id || p.userId)"
+          @send-invite="handleThumbsUp"
+          @chat="navigateToChat"
         />
       </div>
     </template>
@@ -77,6 +80,7 @@
 import InviteSentModal from '../components/InviteSentModal.vue'
 import ConfirmActionModal from '../components/ConfirmActionModal.vue'
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import UserProfileCard from '../components/UserProfileCard.vue'
 import { ApiService } from '../services/api'
 import { useProfileStore } from '../stores/profile'
@@ -84,6 +88,7 @@ import { useAuthStore } from '../stores/auth'
 
 const profileStore = useProfileStore()
 const authStore = useAuthStore()
+const router = useRouter()
 
 // Loading and error states
 const loading = ref(false)
@@ -100,17 +105,104 @@ const inviteModalMessage = computed(() =>
     : ''
 )
 
+// Track thumbs-ups sent by current user
+const thumbsUpsSent = ref(new Set())
+
+// Track thumbs-ups received from other users (from backend)
+const thumbsUpsReceived = ref(new Set())
+
+// Track mutual matches per profile (cached results from _hasMutualMatch)
+const mutualMatchCache = ref(new Map<string, boolean>())
+
+// Check if a profile has a mutual match with current user
+async function checkMutualMatch(profileId: string): Promise<boolean> {
+  // Check cache first
+  if (mutualMatchCache.value.has(profileId)) {
+    return mutualMatchCache.value.get(profileId) || false
+  }
+  
+  try {
+    const session = authStore.session
+    if (!session) return false
+    
+    const result = await ApiService.callConceptAction('UserProfile', '_hasMutualMatch', {
+      session,
+      otherUser: profileId
+    })
+    
+    // Handle different response formats
+    const hasMatch = result === true || result?.hasMatch === true || result?.mutualMatch === true
+    mutualMatchCache.value.set(profileId, hasMatch)
+    return hasMatch
+  } catch (e) {
+    console.error('[checkMutualMatch] Error:', e)
+    return false
+  }
+}
+
+async function handleThumbsUp(profile) {
+  const profileId = profile._id || profile.userId
+  if (!profileId) return
+  
+  // Open confirmation modal first
+  openInviteModal(profile)
+}
+
+async function confirmSendInvite() {
+  if (!selectedInviteProfile.value) return
+  
+  const profile = selectedInviteProfile.value
+  const profileId = profile._id || profile.userId
+  
+  try {
+    const session = authStore.session
+    if (!session) {
+      error.value = 'Session not found'
+      return
+    }
+    
+    // Call suggestMatch API
+    const result = await ApiService.callConceptAction('UserProfile', 'suggestMatch', {
+      session,
+      otherUser: profileId
+    })
+    
+    // Check for errors
+    if (result && typeof result === 'object' && 'error' in result) {
+      error.value = result.error as string
+      showInviteModal.value = false
+      selectedInviteProfile.value = null
+      return
+    }
+    
+    // Success - mark as sent and refresh mutual match status
+    thumbsUpsSent.value.add(profileId)
+    
+    // Check if this created a mutual match
+    const hasMutual = await checkMutualMatch(profileId)
+    if (hasMutual) {
+      mutualMatchCache.value.set(profileId, true)
+    }
+    
+    showInviteModal.value = false
+    sentInviteProfile.value = profile
+    showSentModal.value = true
+    selectedInviteProfile.value = null
+  } catch (e) {
+    console.error('[confirmSendInvite] Error:', e)
+    error.value = e instanceof Error ? e.message : 'Failed to send request'
+    showInviteModal.value = false
+    selectedInviteProfile.value = null
+  }
+}
+
 function openInviteModal(profile) {
   selectedInviteProfile.value = profile
   showInviteModal.value = true
 }
 
-function confirmSendInvite() {
-  // Here you would send the invite (API call, etc)
-  showInviteModal.value = false
-  sentInviteProfile.value = selectedInviteProfile.value
-  showSentModal.value = true
-  selectedInviteProfile.value = null
+function navigateToChat(profileId: string) {
+  router.push(`/chat/${profileId}`)
 }
 
 // Profiles array - will be populated from API
@@ -180,6 +272,11 @@ function matchesTimeOfDayCategory(currentUserTime: string | undefined, partnerTi
   // 1. Partners with "All Times" (flexible)
   // 2. Partners with the exact same time
   return partnerTimeCategory === 'All Times' || partnerTimeCategory === currentTime
+}
+
+// Helper function to check mutual match for a profile ID
+function hasMutualMatch(profileId: string): boolean {
+  return mutualMatchCache.value.get(profileId) || false
 }
 
 // Filtered profiles (excluding current user, matching pace and user-selected filters)
@@ -358,6 +455,17 @@ async function fetchUsersInArea() {
     profiles.value = profilesWithImages.filter((p: any) => {
       return p.displayname && p.displayname !== 'Unknown User' && p.isActive !== false
     })
+    
+    // Check mutual matches for all loaded profiles in background
+    profiles.value.forEach(async (profile: any) => {
+      const profileId = profile._id || profile.userId
+      if (profileId) {
+        const hasMutual = await checkMutualMatch(profileId)
+        if (hasMutual) {
+          mutualMatchCache.value.set(profileId, true)
+        }
+      }
+    })
   } catch (e) {
     console.error('Error fetching users in area:', e)
     error.value = e instanceof Error ? e.message : 'Failed to fetch users in your area.'
@@ -366,9 +474,45 @@ async function fetchUsersInArea() {
   }
 }
 
-// Load users when component mounts
-onMounted(() => {
-  fetchUsersInArea()
+// Fetch received thumbs-ups from backend
+async function fetchReceivedThumbsUps() {
+  try {
+    const session = authStore.session
+    if (!session) return
+    
+    const result = await ApiService.callConceptAction('UserProfile', '_getThumbsUpsReceived', { session })
+    
+    // Handle different response formats
+    let userIds: string[] = []
+    if (Array.isArray(result)) {
+      userIds = result
+    } else if (result && typeof result === 'object') {
+      if ('userIds' in result && Array.isArray(result.userIds)) {
+        userIds = result.userIds
+      } else if ('users' in result && Array.isArray(result.users)) {
+        userIds = result.users.map((u: any) => u._id || u.userId || u.id).filter(Boolean)
+      }
+    }
+    
+    thumbsUpsReceived.value = new Set(userIds)
+    
+    // Check mutual matches for all received thumbs-ups
+    for (const userId of userIds) {
+      const hasMutual = await checkMutualMatch(userId)
+      if (hasMutual) {
+        mutualMatchCache.value.set(userId, true)
+      }
+    }
+  } catch (e) {
+    console.error('[fetchReceivedThumbsUps] Error:', e)
+  }
+}
+
+onMounted(async () => {
+  await fetchUsersInArea()
+  await fetchReceivedThumbsUps()
+  // Note: We track thumbsUpsSent locally as user sends them.
+  // If backend has an endpoint to fetch sent thumbs-ups, we could call it here too.
 })
 </script>
 
