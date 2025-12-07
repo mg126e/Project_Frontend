@@ -101,13 +101,17 @@
           </div>
           <div class="form-group">
             <label>Photo (Optional)</label>
-            <input 
-              type="file" 
-              accept="image/*" 
-              @change="handleImageSelect" 
-              ref="fileInput"
-              class="file-input"
-            />
+            <label for="milestonePhoto" class="file-input-label">
+              <input 
+                id="milestonePhoto"
+                type="file" 
+                accept="image/*" 
+                @change="handleImageSelect" 
+                ref="fileInput"
+                class="file-input"
+              />
+              <span>Choose Image</span>
+            </label>
             <div v-if="imagePreview" class="image-preview">
               <img :src="imagePreview" alt="Preview" />
               <button @click="removeImage" class="remove-image-button" type="button">&times;</button>
@@ -900,10 +904,19 @@ onMounted(async () => {
 .map-select {
   flex: 1;
   padding: 0.75rem;
-  border: 2px solid var(--color-primary-border);
+  border: 1.5px solid var(--color-primary-border);
   border-radius: 8px;
   font-size: 1rem;
-  background: white;
+  background: #f7fafd;
+  color: var(--color-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border 0.18s;
+  outline: none;
+}
+
+.map-select:focus {
+  border-color: var(--color-primary);
 }
 
 .create-button {
@@ -1083,11 +1096,20 @@ onMounted(async () => {
   border: none;
   font-size: 2rem;
   cursor: pointer;
-  color: #666;
+  color: var(--color-primary);
   line-height: 1;
   padding: 0;
   width: 2rem;
   height: 2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.close-button:hover {
+  background: var(--color-primary-light);
 }
 
 .modal-body {
@@ -1098,19 +1120,19 @@ onMounted(async () => {
   margin-bottom: 1.5rem;
 }
 
-.form-group label {
+.form-group > label:not(.file-input-label) {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 600;
   color: var(--color-primary);
 }
 
-.form-group input,
+.form-group input:not(.file-input),
 .form-group textarea,
 .form-group select {
   width: 100%;
   padding: 0.75rem;
-  border: 2px solid var(--color-primary-border);
+  border: 1.5px solid var(--color-primary-border);
   border-radius: 8px;
   font-size: 1rem;
   font-family: inherit;
@@ -1162,7 +1184,24 @@ onMounted(async () => {
 }
 
 .file-input {
+  display: none;
+}
+
+.file-input-label {
+  display: inline-block;
+  background: var(--color-accent);
+  color: white;
+  border-radius: 6px;
+  padding: 0.5em 1em;
+  font-weight: 500;
+  font-size: 0.95rem;
   cursor: pointer;
+  transition: background 0.2s, border 0.2s;
+  text-align: center;
+}
+
+.file-input-label:hover {
+  background: var(--color-accent-dark);
 }
 
 .image-preview {
