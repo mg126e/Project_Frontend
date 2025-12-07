@@ -21,6 +21,25 @@
         </div>
       </div>
     </div>
+
+    <!-- Active Runs Section -->
+    <div v-if="activeRuns.length > 0" class="active-runs-section" :class="{ 'section-visible': cardsVisible }">
+      <h2 class="section-title">Active Runs</h2>
+      <div class="runs-grid">
+        <div v-for="run in activeRuns" :key="run._id" class="run-card-dashboard">
+          <div class="run-card-content">
+            <h3>Run with Partner</h3>
+            <p class="run-card-subtitle">Scheduled run in progress</p>
+          </div>
+          <div class="run-card-actions">
+            <router-link :to="`/run/${run._id}`" class="btn-view-run">View Details</router-link>
+          </div>
+        </div>
+      </div>
+      <div v-if="activeRuns.length > 0" class="view-all-runs">
+        <router-link to="/find-buddy" class="view-all-link">View all runs and invites →</router-link>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -30,11 +49,13 @@ import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useProfileStore } from '../stores/profile';
 import { useSharedGoalsStore } from '../stores/sharedGoals';
+import { useOneRunMatchingStore } from '../stores/oneRunMatching';
 import { ApiService } from '../services/api';
 
 const auth = useAuthStore();
 const profileStore = useProfileStore();
 const sharedGoalsStore = useSharedGoalsStore();
+const oneRunStore = useOneRunMatchingStore();
 
 const displayName = computed(() => {
   const profile = profileStore.profile;
@@ -111,10 +132,14 @@ async function fetchMatches() {
   }
 }
 
+const activeRuns = computed(() => oneRunStore.activeRuns);
+
 onMounted(async () => {
   await profileStore.fetchProfile();
   await sharedGoalsStore.fetchAllSharedGoalsForUser();
   await fetchMatches();
+  // Fetch runs to populate active runs
+  await oneRunStore.fetchMatches();
   
   stats.value.goals = sharedGoalsStore.sharedGoals.length;
 
@@ -243,5 +268,103 @@ onMounted(async () => {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Active Runs Section */
+.active-runs-section {
+  margin-top: 3rem;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.6s ease-out;
+}
+
+.active-runs-section.section-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.section-title {
+  color: var(--color-primary);
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.runs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.run-card-dashboard {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+}
+
+.run-card-dashboard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.run-card-content h3 {
+  color: var(--color-primary);
+  font-size: 1.2rem;
+  margin: 0 0 0.5rem 0;
+  font-weight: 600;
+}
+
+.run-card-subtitle {
+  color: #666;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.run-card-actions {
+  margin-top: 1rem;
+}
+
+.btn-view-run {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  background: var(--color-primary);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: background 0.2s, transform 0.2s;
+  text-align: center;
+}
+
+.btn-view-run:hover {
+  background: var(--color-primary-dark, #1a5f3f);
+  transform: scale(1.05);
+}
+
+.view-all-runs {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.view-all-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: color 0.2s;
+}
+
+.view-all-link:hover {
+  color: var(--color-primary-dark, #1a5f3f);
+  text-decoration: underline;
 }
 </style>
