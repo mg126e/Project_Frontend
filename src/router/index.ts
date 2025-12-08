@@ -143,7 +143,7 @@ const router = createRouter({
 			],
 		},
 		{
-			path: '/chat/:id',
+			path: '/chat/:threadId',
 			component: () => import('../components/DashboardLayout.vue'),
 			meta: { requiresAuth: true },
 			children: [

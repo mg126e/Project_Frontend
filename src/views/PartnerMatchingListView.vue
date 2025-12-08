@@ -188,15 +188,15 @@ async function confirmSendInvite() {
       showInviteModal.value = false
       selectedInviteProfile.value = null
       
-      // Immediately navigate to chat with the match
-      router.push(`/chat/${profileId}`)
+      // Immediately navigate to chat with the match (using thread ID)
+      await navigateToChat(profileId)
     } else {
       // Check if mutual match exists (might have been created by other user)
       const hasMutual = await checkMutualMatch(profileId)
       if (hasMutual) {
         mutualMatchCache.value.set(profileId, true)
-        // Navigate to chat if mutual match exists
-        router.push(`/chat/${profileId}`)
+        // Navigate to chat if mutual match exists (using thread ID)
+        await navigateToChat(profileId)
       } else {
         // No mutual match yet, just show success message
         showInviteModal.value = false
@@ -218,8 +218,47 @@ function openInviteModal(profile) {
   showInviteModal.value = true
 }
 
-function navigateToChat(profileId: string) {
-  router.push(`/chat/${profileId}`)
+async function navigateToChat(profileId: string) {
+  try {
+    const session = authStore.session
+    if (!session) {
+      error.value = 'Session not found'
+      return
+    }
+    
+    // Call _getOrCreateThreadForMatchedUser to get or create the thread
+    const result = await ApiService.callConceptAction('UserProfile', '_getOrCreateThreadForMatchedUser', {
+      session,
+      otherUser: profileId
+    })
+    
+    // Check for errors
+    if (result && typeof result === 'object' && 'error' in result) {
+      error.value = result.error as string
+      return
+    }
+    
+    // Extract thread ID from response
+    // Response format: { threadId: '...' } or { thread: '...' } or just the threadId string
+    let extractedThreadId: string | undefined
+    
+    if (typeof result === 'string') {
+      extractedThreadId = result
+    } else if (result && typeof result === 'object') {
+      extractedThreadId = result.threadId || result.thread || (result._id as string)
+    }
+    
+    if (!extractedThreadId) {
+      error.value = 'Failed to get thread ID from response'
+      return
+    }
+    
+    // Navigate to chat with thread ID
+    router.push(`/chat/${extractedThreadId}`)
+  } catch (e) {
+    console.error('[navigateToChat] Error:', e)
+    error.value = e instanceof Error ? e.message : 'Failed to open chat'
+  }
 }
 
 // Profiles array - will be populated from API
