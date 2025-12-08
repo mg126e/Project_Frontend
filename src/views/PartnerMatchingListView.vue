@@ -130,8 +130,8 @@ async function checkMutualMatch(profileId: string): Promise<boolean> {
       otherUser: profileId
     })
     
-    // Handle different response formats
-    const hasMatch = result === true || result?.hasMatch === true || result?.mutualMatch === true
+    // Response format: { hasMutualMatch: true/false }
+    const hasMatch = result?.hasMutualMatch === true
     mutualMatchCache.value.set(profileId, hasMatch)
     return hasMatch
   } catch (e) {
@@ -474,6 +474,28 @@ async function fetchUsersInArea() {
   }
 }
 
+// Fetch sent thumbs-ups from backend
+async function fetchSentThumbsUps() {
+  try {
+    const session = authStore.session
+    if (!session) return
+    
+    const result = await ApiService.callConceptAction('UserProfile', '_getThumbsUpsSent', { session })
+    
+    // Response format: { userIds: [...] }
+    let userIds: string[] = []
+    if (result && typeof result === 'object' && 'userIds' in result && Array.isArray(result.userIds)) {
+      userIds = result.userIds
+    } else if (Array.isArray(result)) {
+      userIds = result
+    }
+    
+    thumbsUpsSent.value = new Set(userIds)
+  } catch (e) {
+    console.error('[fetchSentThumbsUps] Error:', e)
+  }
+}
+
 // Fetch received thumbs-ups from backend
 async function fetchReceivedThumbsUps() {
   try {
@@ -482,25 +504,27 @@ async function fetchReceivedThumbsUps() {
     
     const result = await ApiService.callConceptAction('UserProfile', '_getThumbsUpsReceived', { session })
     
-    // Handle different response formats
+    // Response format: { userIds: [...] }
     let userIds: string[] = []
-    if (Array.isArray(result)) {
+    if (result && typeof result === 'object' && 'userIds' in result && Array.isArray(result.userIds)) {
+      userIds = result.userIds
+    } else if (Array.isArray(result)) {
       userIds = result
-    } else if (result && typeof result === 'object') {
-      if ('userIds' in result && Array.isArray(result.userIds)) {
-        userIds = result.userIds
-      } else if ('users' in result && Array.isArray(result.users)) {
-        userIds = result.users.map((u: any) => u._id || u.userId || u.id).filter(Boolean)
-      }
     }
     
     thumbsUpsReceived.value = new Set(userIds)
     
     // Check mutual matches for all received thumbs-ups
+    // A mutual match exists if userId is in both sent and received
     for (const userId of userIds) {
-      const hasMutual = await checkMutualMatch(userId)
-      if (hasMutual) {
+      if (thumbsUpsSent.value.has(userId)) {
         mutualMatchCache.value.set(userId, true)
+      } else {
+        // Still check via API to be sure (in case there's an active match)
+        const hasMutual = await checkMutualMatch(userId)
+        if (hasMutual) {
+          mutualMatchCache.value.set(userId, true)
+        }
       }
     }
   } catch (e) {
@@ -509,10 +533,11 @@ async function fetchReceivedThumbsUps() {
 }
 
 onMounted(async () => {
-  await fetchUsersInArea()
+  // Fetch sent and received thumbs-ups first to populate state
+  await fetchSentThumbsUps()
   await fetchReceivedThumbsUps()
-  // Note: We track thumbsUpsSent locally as user sends them.
-  // If backend has an endpoint to fetch sent thumbs-ups, we could call it here too.
+  // Then fetch and display profiles
+  await fetchUsersInArea()
 })
 </script>
 
