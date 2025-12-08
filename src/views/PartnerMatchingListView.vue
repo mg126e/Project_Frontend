@@ -68,16 +68,10 @@
       @confirm="confirmSendInvite"
     />
 
-    <InviteSentModal
-      v-if="showSentModal"
-      :recipient="sentInviteProfile?.displayname || ''"
-      @close="showSentModal = false"
-    />
   </section>
 </template>
 
 <script setup lang="ts">
-import InviteSentModal from '../components/InviteSentModal.vue'
 import ConfirmActionModal from '../components/ConfirmActionModal.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -96,17 +90,18 @@ const error = ref('')
 
 // Invite modal state
 const showInviteModal = ref(false)
-const showSentModal = ref(false)
 const selectedInviteProfile = ref(null)
-const sentInviteProfile = ref(null)
 const inviteModalMessage = computed(() =>
   selectedInviteProfile.value
-    ? `Are you sure you want to send an invite to ${selectedInviteProfile.value.displayname}?`
+    ? `Send a request to ${selectedInviteProfile.value.displayname}?`
     : ''
 )
 
 // Track thumbs-ups sent by current user
 const thumbsUpsSent = ref(new Set())
+
+// Track suggestion IDs for sent requests (profileId -> suggestionId)
+const suggestionIds = ref(new Map<string, string>())
 
 // Track thumbs-ups received from other users (from backend)
 const thumbsUpsReceived = ref(new Set())
@@ -144,6 +139,12 @@ async function handleThumbsUp(profile) {
   const profileId = profile._id || profile.userId
   if (!profileId) return
   
+  // If request already sent, unsend it
+  if (thumbsUpsSent.value.has(profileId)) {
+    await handleUnsendRequest(profile)
+    return
+  }
+  
   // Open confirmation modal first
   openInviteModal(profile)
 }
@@ -152,7 +153,8 @@ async function confirmSendInvite() {
   if (!selectedInviteProfile.value) return
   
   const profile = selectedInviteProfile.value
-  const profileId = profile._id || profile.userId
+  // Prefer userId over _id since backend uses user IDs
+  const recipientId = profile.userId || profile._id || profile.id
   
   try {
     const session = authStore.session
@@ -161,10 +163,10 @@ async function confirmSendInvite() {
       return
     }
     
-    // Call suggestMatch API
+    // Call suggestMatch API - use recipientId (the person who will receive the request)
     const result = await ApiService.callConceptAction('UserProfile', 'suggestMatch', {
       session,
-      otherUser: profileId
+      otherUser: recipientId
     })
     
     // Check for errors
@@ -175,33 +177,56 @@ async function confirmSendInvite() {
       return
     }
     
-    // Success - mark as sent
-    thumbsUpsSent.value.add(profileId)
+    // Success - mark as sent and store suggestion ID if available
+    // recipientId is the person who received the request
+    // Store with all possible ID formats for lookup
+    const allRecipientIdVariants = [
+      recipientId,
+      profile._id,
+      profile.userId,
+      profile.id
+    ].filter(Boolean)
+    
+    allRecipientIdVariants.forEach(id => {
+      thumbsUpsSent.value.add(id)
+    })
+    
+    // Store suggestion ID if present in response (response format: { request: '...', hasMutualMatch: true })
+    // Map suggestion ID to recipient ID (the person who received the request)
+    if (result && typeof result === 'object' && 'request' in result && result.request) {
+      const suggestionId = result.request as string
+      // Store with all ID variants for reliable lookup
+      allRecipientIdVariants.forEach(id => {
+        suggestionIds.value.set(id, suggestionId)
+      })
+      console.log('[confirmSendInvite] Stored suggestion ID:', suggestionId, 'for recipient:', recipientId)
+    }
     
     // Check if response indicates a mutual match was created
-    // Response format: { request: '...', hasMutualMatch: true }
     const hasMutualMatch = result?.hasMutualMatch === true
     
     if (hasMutualMatch) {
       // Mutual match created! Update cache and navigate to chat
-      mutualMatchCache.value.set(profileId, true)
+      allRecipientIdVariants.forEach(id => {
+        mutualMatchCache.value.set(id, true)
+      })
       showInviteModal.value = false
       selectedInviteProfile.value = null
       
       // Immediately navigate to chat with the match (using thread ID)
-      await navigateToChat(profileId)
+      await navigateToChat(recipientId)
     } else {
       // Check if mutual match exists (might have been created by other user)
-      const hasMutual = await checkMutualMatch(profileId)
+      const hasMutual = await checkMutualMatch(recipientId)
       if (hasMutual) {
-        mutualMatchCache.value.set(profileId, true)
+        allRecipientIdVariants.forEach(id => {
+          mutualMatchCache.value.set(id, true)
+        })
         // Navigate to chat if mutual match exists (using thread ID)
-        await navigateToChat(profileId)
+        await navigateToChat(recipientId)
       } else {
-        // No mutual match yet, just show success message
+        // No mutual match yet, just close the modal
         showInviteModal.value = false
-        sentInviteProfile.value = profile
-        showSentModal.value = true
         selectedInviteProfile.value = null
       }
     }
@@ -210,6 +235,112 @@ async function confirmSendInvite() {
     error.value = e instanceof Error ? e.message : 'Failed to send request'
     showInviteModal.value = false
     selectedInviteProfile.value = null
+  }
+}
+
+async function handleUnsendRequest(profile) {
+  // Get the recipient user ID (the person who received the request)
+  // Try both _id and userId since profile IDs and user IDs might be different
+  const recipientId = profile.userId || profile._id || profile.id
+  if (!recipientId) {
+    console.error('[handleUnsendRequest] No recipient ID found in profile:', profile)
+    return
+  }
+  
+  try {
+    const session = authStore.session
+    if (!session) {
+      error.value = 'Session not found'
+      return
+    }
+    
+    // Get the current user's ID (the person who sent the request - the candidate)
+    const candidateId = authStore.user?.id
+    if (!candidateId) {
+      error.value = 'User ID not found'
+      return
+    }
+    
+    console.log('[handleUnsendRequest] Looking up suggestion ID for candidate:', candidateId, 'recipient:', recipientId)
+    
+    // First, try to get suggestion ID from cache
+    let suggestionId: string | undefined = suggestionIds.value.get(recipientId)
+    
+    // If not in cache, use the new API to directly fetch the suggestion ID
+    if (!suggestionId) {
+      try {
+        const result = await ApiService.callConceptAction<any>('PartnerMatching', '_getSuggestionIdForUser', {
+          session,
+          candidate: candidateId,
+          recipient: recipientId
+        })
+        
+        // Response might be just the ID string, or an object with suggestionId
+        if (typeof result === 'string') {
+          suggestionId = result
+        } else if (result && typeof result === 'object') {
+          suggestionId = result.suggestionId || result.suggestion || result._id || result.id
+        }
+        
+        if (suggestionId) {
+          console.log('[handleUnsendRequest] Found suggestion ID via API:', suggestionId)
+          // Cache it for future use
+          suggestionIds.value.set(recipientId, suggestionId)
+        } else {
+          console.warn('[handleUnsendRequest] API returned no suggestion ID. Response:', result)
+        }
+      } catch (apiError) {
+        console.error('[handleUnsendRequest] Error fetching suggestion ID from API:', apiError)
+        // Continue - we'll try to update local state anyway
+      }
+    } else {
+      console.log('[handleUnsendRequest] Using cached suggestion ID:', suggestionId)
+    }
+    
+    // If we have a suggestion ID, call declineSuggestion
+    if (suggestionId) {
+      await ApiService.callConceptAction('PartnerMatching', 'declineSuggestion', {
+        suggestion: suggestionId,
+        recipient: recipientId,
+        candidate: candidateId
+      })
+      console.log('[handleUnsendRequest] Successfully declined suggestion:', suggestionId)
+    } else {
+      // If no suggestion ID found, the request might have already been declined, accepted, or expired
+      console.warn('[handleUnsendRequest] No suggestion ID found - request may have already been processed')
+      // Still update local state to reflect user's intent
+    }
+    
+    // Remove from sent thumbs-ups and suggestion IDs (using all possible ID formats)
+    const allRecipientIdVariants = [
+      recipientId,
+      profile._id,
+      profile.userId,
+      profile.id
+    ].filter(Boolean)
+    
+    allRecipientIdVariants.forEach(id => {
+      thumbsUpsSent.value.delete(id)
+      suggestionIds.value.delete(id)
+      mutualMatchCache.value.delete(id)
+    })
+  } catch (e) {
+    console.error('[handleUnsendRequest] Error:', e)
+    error.value = e instanceof Error ? e.message : 'Failed to unsend request'
+    
+    // Even if API call fails, update local state to reflect user's intent
+    const allRecipientIdVariants = [
+      recipientId,
+      profile._id,
+      profile.userId,
+      profile.id
+    ].filter(Boolean)
+    
+    allRecipientIdVariants.forEach(id => {
+      thumbsUpsSent.value.delete(id)
+      suggestionIds.value.delete(id)
+      mutualMatchCache.value.delete(id)
+    })
   }
 }
 
@@ -530,23 +661,80 @@ async function fetchUsersInArea() {
   }
 }
 
-// Fetch sent thumbs-ups from backend
+// Fetch sent thumbs-ups from backend with suggestion IDs
 async function fetchSentThumbsUps() {
   try {
     const session = authStore.session
     if (!session) return
     
-    const result = await ApiService.callConceptAction('UserProfile', '_getThumbsUpsSent', { session })
-    
-    // Response format: { userIds: [...] }
+    // First, get the list of users we've sent requests to (using the old API as fallback)
     let userIds: string[] = []
-    if (result && typeof result === 'object' && 'userIds' in result && Array.isArray(result.userIds)) {
-      userIds = result.userIds
-    } else if (Array.isArray(result)) {
-      userIds = result
+    try {
+      const oldResult = await ApiService.callConceptAction<any>('UserProfile', '_getThumbsUpsSent', { session })
+      if (oldResult) {
+        if (Array.isArray(oldResult)) {
+          userIds = oldResult
+        } else if (typeof oldResult === 'object' && 'userIds' in oldResult && Array.isArray(oldResult.userIds)) {
+          userIds = oldResult.userIds
+        }
+      }
+    } catch (e) {
+      console.warn('[fetchSentThumbsUps] Could not fetch from old API:', e)
     }
     
+    // Then, try to get suggestion IDs from the new API
+    try {
+      const result = await ApiService.callConceptAction<any>('PartnerMatching', '_getThumbsUpsSentWithIds', { session })
+      
+      console.log('[fetchSentThumbsUps] _getThumbsUpsSentWithIds API response:', result)
+      
+      // Response format: { suggestions: [{ suggestionId: "...", recipientId: "..." }, ...] }
+      let suggestions: any[] = []
+      if (result && typeof result === 'object' && 'suggestions' in result && Array.isArray(result.suggestions)) {
+        suggestions = result.suggestions
+      } else if (Array.isArray(result)) {
+        suggestions = result
+      }
+      
+      console.log('[fetchSentThumbsUps] Parsed suggestions:', suggestions)
+      
+      // Extract user IDs and store suggestion IDs
+      suggestions.forEach((suggestion: any) => {
+        // Try multiple ways to get recipient ID
+        const recipientId = suggestion.recipientId || suggestion.recipient
+        const recipientIdObj = suggestion.recipientId || suggestion.recipient
+        const recipientIdFromObj = typeof recipientIdObj === 'object' 
+          ? (recipientIdObj._id || recipientIdObj.userId || recipientIdObj.id)
+          : null
+        const finalRecipientId = recipientId || recipientIdFromObj
+        
+        const suggestionId = suggestion.suggestionId || suggestion.suggestion || suggestion._id || suggestion.id
+        
+        if (finalRecipientId) {
+          // Add to userIds if not already there
+          if (!userIds.includes(finalRecipientId)) {
+            userIds.push(finalRecipientId)
+          }
+          // Store suggestion ID mapped to recipient ID (the person who received the request)
+          if (suggestionId) {
+            suggestionIds.value.set(finalRecipientId, suggestionId)
+            console.log('[fetchSentThumbsUps] Stored suggestion ID:', suggestionId, 'for recipient:', finalRecipientId)
+          } else {
+            console.warn('[fetchSentThumbsUps] No suggestion ID found in suggestion:', suggestion)
+          }
+        } else {
+          console.warn('[fetchSentThumbsUps] No recipient ID found in suggestion:', suggestion)
+        }
+      })
+    } catch (e) {
+      console.warn('[fetchSentThumbsUps] Could not fetch suggestion IDs from new API:', e)
+      // Continue with just the user IDs from the old API
+    }
+    
+    // Update thumbsUpsSent with all user IDs we found
     thumbsUpsSent.value = new Set(userIds)
+    console.log('[fetchSentThumbsUps] Final suggestionIds map:', Array.from(suggestionIds.value.entries()))
+    console.log('[fetchSentThumbsUps] Final thumbsUpsSent set:', Array.from(thumbsUpsSent.value))
   } catch (e) {
     console.error('[fetchSentThumbsUps] Error:', e)
   }
