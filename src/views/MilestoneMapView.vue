@@ -668,38 +668,22 @@ async function loadPartners() {
   const userMap: { [key: string]: { id: string; displayname: string } } = {};
   
   try {
-    // 1. Fetch long-term partners from PartnerMatching
-      const partnersResult = await ApiService.callConceptAction(
-        'PartnerMatching',
-        '_getPartners',
-        { user: auth.user.id }
-      );
-      
-      if (partnersResult && partnersResult.partners && Array.isArray(partnersResult.partners)) {
-        for (const partnerId of partnersResult.partners) {
-          if (partnerId !== auth.user.id && !userMap[partnerId]) {
-            userMap[partnerId] = { id: partnerId, displayname: partnerId };
-          }
+    // Fetch long-term partners from PartnerMatching
+    const partnersResult = await ApiService.callConceptAction(
+      'PartnerMatching',
+      '_getPartners',
+      { user: auth.user.id }
+    );
+    
+    if (partnersResult && partnersResult.partners && Array.isArray(partnersResult.partners)) {
+      for (const partnerId of partnersResult.partners) {
+        if (partnerId !== auth.user.id && !userMap[partnerId]) {
+          userMap[partnerId] = { id: partnerId, displayname: partnerId };
         }
       }
+    }
     
-    // 2. Fetch users from OneRunMatching runs
-      const runsResult = await ApiService.callConceptAction(
-        'OneRunMatching',
-        '_getMatches',
-        { user: auth.user.id }
-      );
-      
-      if (runsResult && Array.isArray(runsResult)) {
-        for (const run of runsResult) {
-          const otherUserId = run.userA === auth.user.id ? run.userB : run.userA;
-          if (otherUserId && otherUserId !== auth.user.id && !userMap[otherUserId]) {
-            userMap[otherUserId] = { id: otherUserId, displayname: otherUserId };
-          }
-        }
-      }
-    
-    // 3. Fetch displaynames and usernames for all users
+    // Fetch displaynames and usernames for all users
     const userIds = Object.keys(userMap);
     
     for (const userId of userIds) {
