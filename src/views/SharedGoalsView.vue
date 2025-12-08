@@ -1,6 +1,9 @@
 <template>
   <section class="shared-goals">
     <h1>Goals</h1>
+    <p class="goals-description">
+      Set shared running goals with your partner and track progress together! Create a goal, break it down into steps, and mark them complete as you achieve them.
+    </p>
     <div v-if="savingGoal" class="saving-overlay">
       <div class="saving-spinner"></div>
       <p>Saving your goal...</p>
@@ -368,6 +371,14 @@ section.shared-goals {
   min-width: 800px;
   border-radius: 24px;
   padding: 3.5rem 4.5rem 3.5rem 4.5rem;
+}
+.goals-description {
+  color: #666;
+  font-size: 1rem;
+  text-align: center;
+  margin: -0.5rem auto 2rem auto;
+  max-width: 800px;
+  line-height: 1.5;
 }
 .goal-form {
   display: flex;

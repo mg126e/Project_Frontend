@@ -115,9 +115,13 @@ onMounted(() => {
   min-width: 180px;
   max-width: 220px;
   background: var(--color-primary-light);
-  border: 1.5px solid var(--color-primary);
   border-radius: 10px;
   padding: 1.2rem 1rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+  cursor: pointer;
+}
+.feature-card:hover {
+  transform: translateY(-8px);
 }
 .feature-card h2 {
   font-family: 'Noto Serif', serif;

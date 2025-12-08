@@ -114,11 +114,11 @@
       <div class="profile-view-main">
         <div class="profile-view-tags">
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Display Name</span><span class="profile-value">{{ profile.displayname }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Gender</span><span class="profile-value">{{ profile.tags.gender === 'other' ? (profile.tags.genderOther || 'other') : profile.tags.gender }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Age</span><span class="profile-value">{{ profile.tags.age }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Running Level</span><span class="profile-value">{{ profile.tags.runningLevel }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Running Pace</span><span class="profile-value">{{ profile.tags.runningPace }}</span></div>
-          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Personality</span><span class="profile-value">{{ profile.tags.personality }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Gender</span><span class="profile-value">{{ profile.tags?.gender === 'other' ? (profile.tags?.genderOther || 'other') : profile.tags?.gender }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Age</span><span class="profile-value">{{ profile.tags?.age }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Running Level</span><span class="profile-value">{{ profile.tags?.runningLevel }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Running Pace</span><span class="profile-value">{{ profile.tags?.runningPace }}</span></div>
+          <div class="profile-tag-row"><span class="profile-label profile-label--primary">Personality</span><span class="profile-value">{{ profile.tags?.personality }}</span></div>
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Preferred Time of Day</span><span class="profile-value">{{ profile.timeOfDayCategory || 'All Times' }}</span></div>
           <div class="profile-tag-row"><span class="profile-label profile-label--primary">Location</span><span class="profile-value">{{ profile.location }}</span></div>
         </div>
@@ -218,9 +218,9 @@ const editForm = ref({
 });
 
 // Profile image URL cache and management
-const profileImageUrls = ref({});
+const profileImageUrls = ref<{ [key: string]: string }>({});
 
-async function getProfileImageUrl(fileId) {
+async function getProfileImageUrl(fileId: string): Promise<string> {
   if (!fileId) return '';
   if (fileId.startsWith('data:image/')) return fileId; // fallback for legacy base64
   if (fileId.startsWith('http://') || fileId.startsWith('https://')) return fileId; // already a URL
@@ -337,17 +337,17 @@ watch(profile, (newProfile) => {
   }
 }, { immediate: true });
 
-function validatePhone(phone) {
+function validatePhone(phone: string): boolean {
   // Accepts (123) 456-7890, 123-456-7890, 1234567890, 123.456.7890, 123 456 7890, +1 (123) 456-7890, etc.
   return /^\s*(\+?1[-.\s]*)?(\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\s*$/.test((phone || '').trim());
 }
 
-function validateLocationFormat(location) {
+function validateLocationFormat(location: string): boolean {
   // Accepts: City, ST (2 letters, case-insensitive, optional spaces)
   return /^\s*[^,]+,\s*[a-zA-Z]{2}\s*$/.test(location);
 }
 
-function validatePaceFormat(pace) {
+function validatePaceFormat(pace: string | number): boolean {
   // Accepts #:## or ##:##, minutes:seconds, 1 or 2 digits for minutes, always 2 digits for seconds
   if (pace === undefined || pace === null) pace = '';
   const paceStr = typeof pace === 'string' ? pace.trim() : String(pace).trim();
@@ -355,26 +355,26 @@ function validatePaceFormat(pace) {
   return result;
 }
 
-function onEmergencyPhoneInput(event) {
-  const phone = event && event.target ? event.target.value : '';
+function onEmergencyPhoneInput(event: Event) {
+  const phone = event && (event.target as HTMLInputElement) ? (event.target as HTMLInputElement).value : '';
   // Only show error if field is non-empty and invalid
   emergencyPhoneError.value = phone.length > 0 && !validatePhone(phone);
 }
 
-function onPaceInput(event) {
-  const pace = event && event.target ? event.target.value : '';
+function onPaceInput(event: Event) {
+  const pace = event && (event.target as HTMLInputElement) ? (event.target as HTMLInputElement).value : '';
   // Only show error if field is non-empty and invalid
   paceInputError.value = pace.length > 0 && !validatePaceFormat(pace);
 }
 
-function onLocationInput(event) {
-  const value = event && event.target ? event.target.value : '';
+function onLocationInput(event: Event) {
+  const value = event && (event.target as HTMLInputElement) ? (event.target as HTMLInputElement).value : '';
   // Only show error if field is non-empty and invalid
   locationError.value = value.length > 0 && !validateLocationFormat(value);
 }
 
-async function onImageChange(e) {
-  const file = e.target.files[0];
+async function onImageChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
 
   try {
@@ -478,7 +478,6 @@ async function saveProfile() {
     profileImage: p.profileImage
   };
   
-  console.log('[saveProfile] Saving timeOfDayCategory:', timeOfDayValue, 'from form value:', p.timeOfDayCategory);
   savingProfile.value = true;
   try {
     await profileStore.batchUpdateProfile(payload);
@@ -507,7 +506,7 @@ async function handleDeleteUser() {
   }
 }
 
-function onPasswordChanged(msg) {
+function onPasswordChanged(msg: string) {
   showPasswordModal.value = false;
   passwordChangeMsg.value = msg;
   setTimeout(() => { passwordChangeMsg.value = ''; }, 4000);

@@ -47,7 +47,7 @@
             </draggable>
             <div class="form-actions">
               <label for="manualStepGen" class="form-label">Add Step</label>
-              <textarea id="manualStepGen" v-model="manualStepInput" class="form-textarea" placeholder="Describe what needs to be done for this step..." rows="3"></textarea>
+              <textarea id="manualStepGen" v-model="manualStepInput" @input="validationError = ''" class="form-textarea" placeholder="Describe what needs to be done for this step..." rows="3"></textarea>
               <span v-if="validationError" class="error-message">{{ validationError }}</span>
               <button type="button" @click="handleAddStep" :disabled="generating || !manualStepInput.trim()" class="next-button">Add Manual Step</button>
             </div>
@@ -67,7 +67,7 @@
           <h3>Enter Steps Manually</h3>
           <div class="form-group">
             <label for="manualStep" class="form-label">Step Description</label>
-            <textarea id="manualStep" v-model="manualStepInput" class="form-textarea" placeholder="Describe what needs to be done for this step..." rows="3" required></textarea>
+            <textarea id="manualStep" v-model="manualStepInput" @input="validationError = ''" class="form-textarea" placeholder="Describe what needs to be done for this step..." rows="3" required></textarea>
             <span v-if="validationError" class="error-message">{{ validationError }}</span>
           </div>
           <draggable v-model="steps" class="steps-list" item-key="id" :animation="200" handle=".drag-handle">
@@ -223,7 +223,6 @@ function handleClose() {
   emit('close');
 }
 function validateManualStep() {
-  validationError.value = '';
   if (!manualStepInput.value.trim()) {
     validationError.value = 'Step description is required';
     return false;

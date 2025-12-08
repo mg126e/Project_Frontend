@@ -47,8 +47,6 @@ async function onLogin() {
 .auth-form {
   max-width: 400px;
   margin: 2rem auto;
-  background: #F9FAFB;
-  border-radius: 16px;
   padding: 2rem 2.5rem;
 }
 .auth-form h1 {
