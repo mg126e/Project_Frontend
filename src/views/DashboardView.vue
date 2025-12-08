@@ -4,14 +4,21 @@
   </div>
   <div v-else class="dashboard-home">
     <h1 class="fade-in">{{ greeting }}{{ displayName ? `, ${displayName}` : '' }}!</h1>
-    <p v-if="welcomeMessageVisible && stats.matches === 0" class="dashboard-welcome-msg fade-in">Ready to get started?</p>
+    <p v-if="welcomeMessageVisible && stats.oneRunMatches === 0 && stats.partnerMatches === 0" class="dashboard-welcome-msg fade-in">Ready to get started?</p>
     <div class="dashboard-stats">
       <div class="stat-card" :class="{ 'card-visible': cardsVisible }" style="animation-delay: 0.1s">
-        <div class="stat-label">Matches</div>
-        <div class="stat-value">{{ animatedStats.matches }}</div>
-        <div v-if="stats.matches === 0" class="stat-hint">
-          <router-link to="/matches" class="stat-cta">Find a running partner</router-link>
+        <div class="stat-label">One Run Matches</div>
+        <div class="stat-value">{{ animatedStats.oneRunMatches }}</div>
+        <div v-if="stats.oneRunMatches === 0" class="stat-hint">
+          <router-link to="/find-buddy" class="stat-cta">Find a running partner</router-link>
+        </div>
       </div>
+      <div class="stat-card" :class="{ 'card-visible': cardsVisible }" style="animation-delay: 0.15s">
+        <div class="stat-label">Partner Matches</div>
+        <div class="stat-value">{{ animatedStats.partnerMatches }}</div>
+        <div v-if="stats.partnerMatches === 0" class="stat-hint">
+          <router-link to="/matches/partner" class="stat-cta">Find a running partner</router-link>
+        </div>
       </div>
       <div v-if="stats.matches > 0" class="stat-card" :class="{ 'card-visible': cardsVisible }" style="animation-delay: 0.2s">
         <div class="stat-label">Total Goals</div>
@@ -71,18 +78,20 @@ const greeting = computed(() => {
 
 const stats = ref({
   goals: 0,
-  matches: 0,
+  oneRunMatches: 0,
+  partnerMatches: 0,
 });
 
 const animatedStats = ref({
   goals: 0,
-  matches: 0,
+  oneRunMatches: 0,
+  partnerMatches: 0,
 });
 
 const cardsVisible = ref(false);
 const welcomeMessageVisible = ref(false);
 
-function animateNumber(key: 'goals' | 'matches', target: number) {
+function animateNumber(key: 'goals' | 'oneRunMatches' | 'partnerMatches', target: number) {
   const duration = 1000;
   const steps = 30;
   const increment = target / steps;
@@ -101,9 +110,9 @@ function animateNumber(key: 'goals' | 'matches', target: number) {
   }, duration / steps);
 }
 
-async function fetchMatches() {
+async function fetchOneRunMatches() {
   if (!auth.user?.id) {
-    stats.value.matches = 0;
+    stats.value.oneRunMatches = 0;
     return;
   }
 
@@ -124,11 +133,61 @@ async function fetchMatches() {
     
     // Filter to only active (non-completed) runs
     const activeMatches = matches.filter((run) => run && !run.completed);
-    stats.value.matches = activeMatches.length;
+    stats.value.oneRunMatches = activeMatches.length;
   } catch (e: any) {
-    console.warn('Failed to fetch matches from API:', e?.message || e);
+    console.warn('Failed to fetch one run matches from API:', e?.message || e);
     // Set to 0 if API call fails
-    stats.value.matches = 0;
+    stats.value.oneRunMatches = 0;
+  }
+}
+
+async function fetchPartnerMatches() {
+  const session = auth.session;
+  if (!session || !auth.user?.id) {
+    stats.value.partnerMatches = 0;
+    return;
+  }
+
+  try {
+    // Get thumbs-ups sent and received
+    const [sentResult, receivedResult] = await Promise.all([
+      ApiService.callConceptAction<string[] | { error: string }>(
+        'UserProfile',
+        '_getThumbsUpsSent',
+        { session }
+      ),
+      ApiService.callConceptAction<string[] | { error: string }>(
+        'UserProfile',
+        '_getThumbsUpsReceived',
+        { session }
+      )
+    ]);
+
+    // Handle sent thumbs-ups
+    let sentUsers: string[] = [];
+    if (Array.isArray(sentResult)) {
+      sentUsers = sentResult;
+    } else if (sentResult && typeof sentResult === 'object' && 'error' in sentResult) {
+      console.warn('Failed to fetch sent thumbs-ups:', sentResult.error);
+    }
+
+    // Handle received thumbs-ups
+    let receivedUsers: string[] = [];
+    if (Array.isArray(receivedResult)) {
+      receivedUsers = receivedResult;
+    } else if (receivedResult && typeof receivedResult === 'object' && 'error' in receivedResult) {
+      console.warn('Failed to fetch received thumbs-ups:', receivedResult.error);
+    }
+
+    // Partner matches are mutual matches (users who are in both lists)
+    const sentSet = new Set(sentUsers);
+    const partnerMatches = receivedUsers.filter(userId => sentSet.has(userId));
+    
+    stats.value.partnerMatches = partnerMatches.length;
+  } catch (e: any) {
+    console.warn('Failed to fetch partner matches from API:', e?.message || e);
+    // Set to 0 if API call fails
+    stats.value.partnerMatches = 0;
   }
 }
 
@@ -263,7 +322,10 @@ async function fetchAllRunDates() {
 onMounted(async () => {
   await profileStore.fetchProfile();
   await sharedGoalsStore.fetchAllSharedGoalsForUser();
-  await fetchMatches();
+  await Promise.all([
+    fetchOneRunMatches(),
+    fetchPartnerMatches()
+  ]);
   // Fetch runs to populate active runs
   await oneRunStore.fetchMatches();
   
@@ -280,7 +342,8 @@ onMounted(async () => {
     welcomeMessageVisible.value = true;
     cardsVisible.value = true;
     animateNumber('goals', stats.value.goals);
-    animateNumber('matches', stats.value.matches);
+    animateNumber('oneRunMatches', stats.value.oneRunMatches);
+    animateNumber('partnerMatches', stats.value.partnerMatches);
   }, 100);
 });
 
