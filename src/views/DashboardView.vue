@@ -395,7 +395,6 @@ watch(activeRuns, async () => {
   gap: 2.8rem;
   margin-bottom: 3rem;
   flex-wrap: wrap;
-  width: 100%;
 }
 .stat-card {
   background: var(--color-primary-light);
@@ -501,6 +500,7 @@ watch(activeRuns, async () => {
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.5rem;
   margin-bottom: 1.5rem;
+  justify-items: center;
 }
 
 .run-card-dashboard {
