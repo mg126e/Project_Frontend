@@ -134,7 +134,6 @@ export const useProfileStore = defineStore('profile', () => {
       tags,
       timeOfDayCategory
     };
-    console.log('[mergeProfile] Merged timeOfDayCategory:', timeOfDayCategory, 'from partial:', partial.timeOfDayCategory);
     return merged;
   }
 
@@ -313,17 +312,13 @@ export const useProfileStore = defineStore('profile', () => {
   async function updateTimeOfDayCategory(timeOfDayCategory: string): Promise<void> {
     // Default to "All Times" if not provided (use nullish coalescing)
     const category = timeOfDayCategory ?? 'All Times';
-    console.log('[updateTimeOfDayCategory] Calling API with category:', category);
     loading.value = true;
     error.value = '';
     try {
       const session = getSession();
       if (!session) throw new Error('Session not found');
-      console.log('[updateTimeOfDayCategory] Session:', session ? 'present' : 'missing');
       const payload = { session, timeOfDayCategory: category };
-      console.log('[updateTimeOfDayCategory] Payload:', payload);
       const result = await ApiService.callConceptAction('UserProfile', 'setTimeOfDayCategory', payload);
-      console.log('[updateTimeOfDayCategory] API response:', result);
       // Check for errors in different response structures
       if (result && typeof result === 'object') {
         // Check if error is directly in result
@@ -422,10 +417,7 @@ export const useProfileStore = defineStore('profile', () => {
       await updateLocation(newProfile.location || '');
       const ec = newProfile.emergencyContact || { name: '', phone: '' };
       await updateEmergencyContact(ec.name || '', ec.phone || '');
-      // Update timeOfDayCategory (default to "All Times" if not provided)
-      // Use nullish coalescing to only default for undefined/null, not empty strings
       const timeOfDayCategory = newProfile.timeOfDayCategory ?? 'All Times';
-      console.log('[batchUpdateProfile] Updating timeOfDayCategory:', timeOfDayCategory, 'from payload:', newProfile.timeOfDayCategory);
       await updateTimeOfDayCategory(timeOfDayCategory);
       const tags = newProfile.tags || {};
       for (const tagType of ['gender', 'age', 'runningLevel', 'runningPace', 'personality']) {

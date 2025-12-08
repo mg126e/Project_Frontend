@@ -13,7 +13,7 @@
     </div>
 
     <div v-else-if="maps.length === 0" class="empty-state">
-      <p>No milestone maps yet.</p>
+      <p>No milestone maps yet. Create a map with your partner!</p>
       <button @click="showCreateMapModal = true" class="create-button">Create Milestone Map</button>
     </div>
 
@@ -33,6 +33,8 @@
         <button @click="showCreateMapModal = true" class="create-button">+ New Map</button>
       </div>
 
+      <p class="map-instruction">Click anywhere on the map to add a milestone!</p>
+
       <div class="map-wrapper">
         <div v-if="mapLoading" class="map-loading">
           <div class="spinner"></div>
@@ -41,14 +43,10 @@
         <div id="leaflet-map" class="leaflet-map" :class="{ hidden: mapLoading }"></div>
       </div>
 
-      <button @click="showAddMilestoneModal = true" class="add-milestone-button">
-        + Add Milestone
-      </button>
-
       <div class="milestones-list">
         <h3>Milestones ({{ milestones.length }})</h3>
         <div v-if="milestones.length === 0" class="no-milestones">
-          <p>No milestones yet. Click on the map or use the button above to add your first milestone!</p>
+          <p>No milestones yet. Click on the map to add your first milestone!</p>
         </div>
         <div v-else class="milestone-items">
           <div v-for="milestone in milestones" :key="milestone.id" class="milestone-item">
@@ -327,22 +325,18 @@ function getMilestoneImageUrl(photoFileId: string): void {
   }
   
   // Fetch URL asynchronously and cache it
-  console.log('Fetching download URL for:', photoFileId);
   ApiService.getDownloadURL(photoFileId).then(result => {
-    console.log('Raw download URL result:', result);
     
     // Handle both array and object responses (similar to UserProfileView)
     const responseData = Array.isArray(result) ? result[0] : result;
     
     if (responseData && 'downloadURL' in responseData && !('error' in responseData)) {
       let downloadURL = responseData.downloadURL;
-      console.log('Got download URL from response:', downloadURL);
       
       // If it's a relative URL, prepend the backend base URL
       if (downloadURL && downloadURL.startsWith('/api/')) {
         const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
         downloadURL = baseURL.replace(/\/api$/, '') + downloadURL;
-        console.log('Converted to absolute URL:', downloadURL);
       }
       
       imageUrls.value[photoFileId] = downloadURL;
@@ -965,21 +959,11 @@ onMounted(async () => {
   z-index: 10;
 }
 
-.add-milestone-button {
-  align-self: flex-start;
-  padding: 0.75rem 1.5rem;
-  background: var(--color-accent);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+.map-instruction {
+  color: #666;
   font-size: 1rem;
-  font-weight: 600;
-  transition: background 0.3s;
-}
-
-.add-milestone-button:hover {
-  background: var(--color-accent-dark);
+  text-align: center;
+  margin: 0;
 }
 
 .milestones-list {

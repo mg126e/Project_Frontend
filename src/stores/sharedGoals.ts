@@ -90,8 +90,6 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
         const session = this.getSession();
         if (!session) throw new Error('Session not found');
         const response = await ApiService.callConceptAction<any>('SharedGoals', 'createSharedGoal', { session, users, description });
-        console.log('[SharedGoalsStore] createSharedGoal response:', JSON.stringify(response, null, 2));
-        console.log('[SharedGoalsStore] Response keys:', Object.keys(response));
         if (response.error) {
           this.error = response.error;
           throw new Error(response.error);
@@ -110,12 +108,7 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
         // Check all properties of response
         if (!goalId) {
           console.error('[SharedGoalsStore] Could not find goal ID in response. Response properties:', Object.getOwnPropertyNames(response));
-          for (const key in response) {
-            console.log(`[SharedGoalsStore] response.${key} =`, response[key]);
-          }
         }
-        
-        console.log('[SharedGoalsStore] Extracted goal ID:', goalId);
         
         if (!goalId) {
           throw new Error('Backend did not return a goal ID');
@@ -175,10 +168,8 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       try {
         const session = this.getSession();
         if (!session) throw new Error('Session not found');
-        console.log('[SharedGoalsStore] Calling generateSharedSteps with:', { session, sharedGoal });
         // Correct backend action name is 'generateSharedSteps'
         const response = await ApiService.callConceptAction<any>('SharedGoals', 'generateSharedSteps', { session, sharedGoal });
-        console.log('[SharedGoalsStore] generateSharedSteps response:', response);
         if (response.error) {
           // Return error object instead of throwing to keep modal alive
           return { error: response.error };

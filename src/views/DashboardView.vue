@@ -567,7 +567,9 @@ watch(activeRuns, async () => {
 }
 
 .view-all-link:hover {
-  color: var(--color-primary-dark, #1a5f3f);
-  text-decoration: underline;
+  background: var(--color-primary-light);
+  border-radius: 6px;
+  padding: 0.1em 0.4em;
+  transition: background 0.2s;
 }
 </style>
