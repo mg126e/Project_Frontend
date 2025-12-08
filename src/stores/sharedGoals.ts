@@ -262,21 +262,6 @@ export const useSharedGoalsStore = defineStore('sharedGoals', {
       } finally {
         this.loading = false;
       }
-    },
-
-    async setInitialized({ users, isInitialized }: { users: string[]; isInitialized: boolean }) {
-      this.loading = true;
-      this.error = '';
-      try {
-        const session = this.getSession();
-        if (!session) throw new Error('Session not found');
-        await ApiService.callConceptAction<any>('SharedGoals', 'setInitialized', { session, users, isInitialized });
-      } catch (err: any) {
-        this.error = err.message || 'Failed to set initialized.';
-        throw err;
-      } finally {
-        this.loading = false;
-      }
     }
   }
 });

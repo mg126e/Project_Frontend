@@ -76,7 +76,6 @@
 import GoalCreationModal from '../components/GoalCreationModal.vue';
 import { useSharedGoalsStore } from '../stores/sharedGoals';
 import { useAuthStore } from '../stores/auth';
-import { useOneRunMatchingStore } from '../stores/oneRunMatching';
 import { storeToRefs } from 'pinia';
 import { ref, computed, onMounted } from 'vue';
 import { format } from 'date-fns';
@@ -99,7 +98,6 @@ function getStepCount(goal) {
 }
 
 const sharedGoalsStore = useSharedGoalsStore();
-const oneRunStore = useOneRunMatchingStore();
 const { sharedGoals, loading, error } = storeToRefs(sharedGoalsStore);
 const auth = useAuthStore();
 const statusFilter = ref('all'); // 'all' | 'active' | 'inactive'
@@ -107,7 +105,7 @@ const userFilter = ref('all'); // 'all' | specific user ID
 const sortBy = ref('newest'); // 'newest' | 'oldest' | 'most-steps' | 'least-steps' | 'recently-closed'
 const showGoalModal = ref(false);
 const savingGoal = ref(false);
-const matchedUsers = ref([]); // Users from PartnerMatching and OneRunMatching
+const matchedUsers = ref([]); // Users from PartnerMatching
 
 // Watch for unexpected changes to showGoalModal
 watch(() => showGoalModal.value, (newVal, oldVal) => {
@@ -246,12 +244,12 @@ function toggleUser(userId) {
   openUsers[userId] = !openUsers[userId];
 }
 
-// Fetch all matched users from PartnerMatching and OneRunMatching
+// Fetch all matched users from PartnerMatching
 async function fetchMatchedUsers() {
   const userMap = {};
   
   try {
-    // 1. Fetch long-term partners from PartnerMatching
+    // Fetch long-term partners from PartnerMatching
     const partnersResult = await ApiService.callConceptAction('PartnerMatching', '_getPartners', {
       user: auth.user.id
     });
@@ -264,18 +262,7 @@ async function fetchMatchedUsers() {
       }
     }
     
-    // 2. Fetch users from OneRunMatching runs
-    await oneRunStore.fetchMatches();
-    if (oneRunStore.runs && Array.isArray(oneRunStore.runs)) {
-      for (const run of oneRunStore.runs) {
-        const otherUserId = run.userA === auth.user.id ? run.userB : run.userA;
-        if (otherUserId && otherUserId !== auth.user.id && !userMap[otherUserId]) {
-          userMap[otherUserId] = { id: otherUserId, displayname: otherUserId };
-        }
-      }
-    }
-    
-    // 3. Fetch displaynames and usernames for all users
+    // Fetch displaynames and usernames for all users
     const userIds = Object.keys(userMap);
     for (const userId of userIds) {
       try {
