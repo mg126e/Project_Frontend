@@ -21,21 +21,24 @@
         <span class="tag">{{ profile.tags.personality }}</span>
       </div>
       <div class="action-buttons">
+        <!-- Show messaging button when there's a mutual match -->
+        <button
+          v-if="hasMutualMatch"
+          class="message-btn"
+          @click="handleChatClick"
+          title="Message your match"
+        >
+          💬 Message
+        </button>
+        <!-- Show thumbs-up button when no mutual match yet -->
         <button 
+          v-else
           class="thumbs-up-btn" 
           :class="{ 'selected': hasThumbsUp }"
           @click="handleThumbsUpClick"
           :title="hasThumbsUp ? 'Request sent' : 'Send request'"
         >
           👍
-        </button>
-        <button
-          v-if="hasMutualMatch"
-          class="chat-btn"
-          @click="handleChatClick"
-          title="Start chatting"
-        >
-          💬 Chat
         </button>
       </div>
     </div>
@@ -226,14 +229,14 @@ function handleChatClick() {
   gap: 1rem;
 }
 
-.chat-btn {
+.message-btn {
   background: var(--color-primary);
   color: white;
   border: none;
   border-radius: 6px;
-  padding: 0.6em 1.2em;
+  padding: 0.7em 1.5em;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 1.05rem;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -241,7 +244,7 @@ function handleChatClick() {
   gap: 0.5rem;
 }
 
-.chat-btn:hover {
+.message-btn:hover {
   background: var(--color-primary-dark);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);

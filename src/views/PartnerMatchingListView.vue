@@ -175,19 +175,36 @@ async function confirmSendInvite() {
       return
     }
     
-    // Success - mark as sent and refresh mutual match status
+    // Success - mark as sent
     thumbsUpsSent.value.add(profileId)
     
-    // Check if this created a mutual match
-    const hasMutual = await checkMutualMatch(profileId)
-    if (hasMutual) {
-      mutualMatchCache.value.set(profileId, true)
-    }
+    // Check if response indicates a mutual match was created
+    // Response format: { request: '...', hasMutualMatch: true }
+    const hasMutualMatch = result?.hasMutualMatch === true
     
-    showInviteModal.value = false
-    sentInviteProfile.value = profile
-    showSentModal.value = true
-    selectedInviteProfile.value = null
+    if (hasMutualMatch) {
+      // Mutual match created! Update cache and navigate to chat
+      mutualMatchCache.value.set(profileId, true)
+      showInviteModal.value = false
+      selectedInviteProfile.value = null
+      
+      // Immediately navigate to chat with the match
+      router.push(`/chat/${profileId}`)
+    } else {
+      // Check if mutual match exists (might have been created by other user)
+      const hasMutual = await checkMutualMatch(profileId)
+      if (hasMutual) {
+        mutualMatchCache.value.set(profileId, true)
+        // Navigate to chat if mutual match exists
+        router.push(`/chat/${profileId}`)
+      } else {
+        // No mutual match yet, just show success message
+        showInviteModal.value = false
+        sentInviteProfile.value = profile
+        showSentModal.value = true
+        selectedInviteProfile.value = null
+      }
+    }
   } catch (e) {
     console.error('[confirmSendInvite] Error:', e)
     error.value = e instanceof Error ? e.message : 'Failed to send request'
