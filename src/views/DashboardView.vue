@@ -20,7 +20,7 @@
           <router-link to="/matches/partner" class="stat-cta">Find a running partner</router-link>
         </div>
       </div>
-      <div v-if="stats.matches > 0" class="stat-card" :class="{ 'card-visible': cardsVisible }" style="animation-delay: 0.2s">
+      <div v-if="stats.oneRunMatches > 0 || stats.partnerMatches > 0" class="stat-card" :class="{ 'card-visible': cardsVisible }" style="animation-delay: 0.2s">
         <div class="stat-label">Total Goals</div>
         <div class="stat-value">{{ animatedStats.goals }}</div>
         <div v-if="stats.goals === 0" class="stat-hint">
@@ -391,9 +391,11 @@ watch(activeRuns, async () => {
 .dashboard-stats {
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 2.8rem;
   margin-bottom: 3rem;
   flex-wrap: wrap;
+  width: 100%;
 }
 .stat-card {
   background: var(--color-primary-light);
