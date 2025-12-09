@@ -381,37 +381,15 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
         { user: userId }
       )
 
-      console.log('[OneRunMatching] fetchActiveInvites raw response:', result)
-      console.log('[OneRunMatching] Current user ID:', userId)
-
       // Backend returns { request: "...", invites: [...] }
       // Extract invites array from response
       const invitesArray = result?.invites || (Array.isArray(result) ? result : [])
-      
-      console.log('[OneRunMatching] Extracted invites array:', invitesArray)
-      console.log('[OneRunMatching] Invites array length:', invitesArray?.length)
-      
+
       if (Array.isArray(invitesArray) && invitesArray.length > 0) {
-        // Log each invite to see its structure
-        invitesArray.forEach((inv, index) => {
-          console.log(`[OneRunMatching] Invite ${index}:`, {
-            _id: inv._id,
-            inviter: inv.inviter,
-            invitees: inv.invitees,
-            sent: inv.sent,
-            acceptanceStatus: inv.acceptanceStatus,
-            userInInvitees: inv.invitees?.includes(userId)
-          })
-        })
-        
         // Merge with existing invites, avoiding duplicates
         const existingIds = new Set(invites.value.map(inv => inv._id))
         const newInvites = invitesArray.filter(inv => !existingIds.has(inv._id))
         invites.value = [...invites.value, ...newInvites]
-        console.log('[OneRunMatching] Total invites in store:', invites.value.length)
-        console.log('[OneRunMatching] Added', newInvites.length, 'new active invites')
-      } else {
-        console.log('[OneRunMatching] No active invites found or invalid response structure')
       }
     } catch (e) {
       console.error('Failed to fetch active invites:', e)
@@ -538,23 +516,9 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
         console.error('[OneRunMatching] No result returned from _getRun')
         return null
       }
-      
-      // Backend may return:
-      // - {runDoc: {...}, invite: {...}} 
-      // - {request: '...', invite: {...}}
-      // - {invite: {...}, ...} (where other fields are the run)
-      // Extract runDoc if present, otherwise use result directly (excluding invite, request, error)
+
       const { invite, error, runDoc, request, ...rest } = result
       const runData = (runDoc || rest) as Run
-      
-      // Log the full response structure to debug
-      console.log('[OneRunMatching] Response structure:', {
-        hasInvite: 'invite' in result,
-        inviteValue: invite,
-        hasRunDoc: 'runDoc' in result,
-        runDocValue: runDoc,
-        allKeys: Object.keys(result)
-      })
       
       // Ensure invite.start is parsed correctly if invite exists
       let processedInvite: Invite | null = null
@@ -591,24 +555,17 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
       if (!userId) return null
 
       // First, try to get invite from backend using run ID
-      try {
         const result = await ApiService.callConceptAction<Invite | { invite?: Invite; error?: string }>(
           'OneRunMatching',
           '_getInviteForRun',
           { run: run._id }
         )
         if (result && !('error' in result)) {
-          console.log('[OneRunMatching] Found invite from backend for run:', run._id)
-          console.log('[OneRunMatching] Raw result from _getInviteForRun:', result)
-          console.log('[OneRunMatching] Result has invite key?', 'invite' in result)
           // Backend may return {invite: {...}} or just the invite directly
           const invite = ('invite' in result && result.invite) ? result.invite : (result as Invite)
-          console.log('[OneRunMatching] Extracted invite:', invite)
           return invite
         }
-      } catch (e) {
-        console.log('[OneRunMatching] _getInviteForRun not available, trying local search')
-      }
+
 
       // Fallback: Fetch all invites and search locally
       await fetchUserInvites()

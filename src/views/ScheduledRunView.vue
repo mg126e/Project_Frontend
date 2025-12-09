@@ -183,24 +183,16 @@ async function loadRunData() {
     
     run.value = result.run
     
-    console.log('[ScheduledRunView] Result invite:', result.invite)
-    console.log('[ScheduledRunView] Result invite type:', typeof result.invite)
-    console.log('[ScheduledRunView] Result invite is null?', result.invite === null)
-    console.log('[ScheduledRunView] Result invite is undefined?', result.invite === undefined)
-    
     // Set loading to false immediately so buttons work
     loading.value = false
     
     // If invite is null, try to find it separately
     if (result.invite) {
-      console.log('[ScheduledRunView] Setting invite from response:', result.invite)
       invite.value = result.invite
     } else {
       // Try to find the invite associated with this run
-      console.log('[ScheduledRunView] Invite not in response, searching for invite...')
       oneRunStore.findInviteForRun(result.run).then(foundInvite => {
         if (foundInvite) {
-          console.log('[ScheduledRunView] Found invite:', foundInvite)
           // Backend may return {invite: {...}} or just the invite directly
           const inviteData = ('invite' in foundInvite && foundInvite.invite) ? foundInvite.invite : foundInvite
           // Ensure invite.start is a string (ISO 8601 format)
@@ -208,10 +200,7 @@ async function loadRunData() {
             ...inviteData,
             start: typeof inviteData.start === 'string' ? inviteData.start : new Date(inviteData.start).toISOString()
           }
-          console.log('[ScheduledRunView] Setting processed invite:', processedInvite)
           invite.value = processedInvite as Invite
-        } else {
-          console.log('[ScheduledRunView] No invite found for this run')
         }
       }).catch(e => {
         console.warn('[ScheduledRunView] Error finding invite:', e)
