@@ -142,48 +142,31 @@ async function fetchOneRunMatches() {
 }
 
 async function fetchPartnerMatches() {
-  const session = auth.session;
-  if (!session || !auth.user?.id) {
+  if (!auth.user?.id) {
     stats.value.partnerMatches = 0;
     return;
   }
 
   try {
-    // Get thumbs-ups sent and received
-    const [sentResult, receivedResult] = await Promise.all([
-      ApiService.callConceptAction<string[] | { error: string }>(
-        'UserProfile',
-        '_getThumbsUpsSent',
-        { session }
-      ),
-      ApiService.callConceptAction<string[] | { error: string }>(
-        'UserProfile',
-        '_getThumbsUpsReceived',
-        { session }
-      )
-    ]);
+    const result = await ApiService.callConceptAction<{ matches?: any[] } | { error: string }>(
+      'PartnerMatching',
+      '_getActiveMatches',
+      { user: auth.user.id }
+    );
 
-    // Handle sent thumbs-ups
-    let sentUsers: string[] = [];
-    if (Array.isArray(sentResult)) {
-      sentUsers = sentResult;
-    } else if (sentResult && typeof sentResult === 'object' && 'error' in sentResult) {
-      console.warn('Failed to fetch sent thumbs-ups:', sentResult.error);
+    // Handle response format: { matches: MatchState[] } or { error: string }
+    if (result && typeof result === 'object' && 'error' in result) {
+      console.warn('Failed to fetch partner matches:', result.error);
+      stats.value.partnerMatches = 0;
+    } else if (result && typeof result === 'object' && 'matches' in result) {
+      const matches = Array.isArray(result.matches) ? result.matches : [];
+      stats.value.partnerMatches = matches.length;
+    } else if (Array.isArray(result)) {
+      // Handle case where result is directly an array
+      stats.value.partnerMatches = result.length;
+    } else {
+      stats.value.partnerMatches = 0;
     }
-
-    // Handle received thumbs-ups
-    let receivedUsers: string[] = [];
-    if (Array.isArray(receivedResult)) {
-      receivedUsers = receivedResult;
-    } else if (receivedResult && typeof receivedResult === 'object' && 'error' in receivedResult) {
-      console.warn('Failed to fetch received thumbs-ups:', receivedResult.error);
-    }
-
-    // Partner matches are mutual matches (users who are in both lists)
-    const sentSet = new Set(sentUsers);
-    const partnerMatches = receivedUsers.filter(userId => sentSet.has(userId));
-    
-    stats.value.partnerMatches = partnerMatches.length;
   } catch (e: any) {
     console.warn('Failed to fetch partner matches from API:', e?.message || e);
     // Set to 0 if API call fails
@@ -497,10 +480,12 @@ watch(activeRuns, async () => {
 
 .runs-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 280px));
   gap: 1.5rem;
   margin-bottom: 1.5rem;
   justify-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .run-card-dashboard {

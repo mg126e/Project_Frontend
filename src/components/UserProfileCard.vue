@@ -30,15 +30,15 @@
         >
           💬 Message
         </button>
-        <!-- Show thumbs-up button when no mutual match yet -->
+        <!-- Show send request button when no mutual match yet -->
         <button 
           v-else
-          class="thumbs-up-btn" 
+          class="send-request-btn" 
           :class="{ 'selected': hasThumbsUp }"
           @click="handleThumbsUpClick"
-          :title="hasThumbsUp ? 'Request sent' : 'Send request'"
+          :title="hasThumbsUp ? 'Unsend request' : 'Send request'"
         >
-          👍
+          {{ hasThumbsUp ? 'Unsend Request' : 'Send Request' }}
         </button>
       </div>
     </div>
@@ -197,30 +197,30 @@ function handleChatClick() {
   font-weight: 600;
   color: #b23b3b;
 }
-.thumbs-up-btn {
-  background: transparent;
-  border: 2px solid var(--color-primary);
-  border-radius: 50%;
-  width: 50px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.8rem;
+.send-request-btn {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.7em 1.5em;
+  font-weight: 600;
+  font-size: 1.05rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.thumbs-up-btn:hover {
-  transform: scale(1.1);
-  border-color: var(--color-accent);
+.send-request-btn:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-.thumbs-up-btn.selected {
+.send-request-btn.selected {
   background: var(--color-accent);
-  border-color: var(--color-accent);
-  transform: scale(1.1);
+  opacity: 0.9;
 }
 
 .action-buttons {

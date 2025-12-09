@@ -3,7 +3,7 @@
     <h1>Find a Running Buddy</h1>
     <p class="page-description">Create and manage one-time run invites to find a running partner!</p>
 
-    <div v-if="loading && !invitesCreated.length && !invitesReceived.length && !activeRuns.length" class="loading-state">
+    <div v-if="loading && !invitesCreated.length && !availableInvites.length && !activeRuns.length" class="loading-state">
       <div class="spinner"></div>
       <p>Loading...</p>
     </div>
@@ -17,7 +17,7 @@
       <h3>Debug Info</h3>
       <p><strong>Total invites in store:</strong> {{ oneRunStore.invites.length }}</p>
       <p><strong>Invites created:</strong> {{ invitesCreated.length }}</p>
-      <p><strong>Invites received:</strong> {{ invitesReceived.length }}</p>
+      <p><strong>Invites received:</strong> {{ availableInvites.length }}</p>
       <p><strong>Current user ID:</strong> {{ authStore.user?.id }}</p>
       <p><strong>Loading:</strong> {{ loading }}</p>
       <details>
@@ -25,8 +25,8 @@
         <pre style="max-height: 200px; overflow: auto;">{{ JSON.stringify(oneRunStore.invites, null, 2) }}</pre>
       </details>
       <details>
-        <summary>Invites Received Filtered ({{ invitesReceived.length }})</summary>
-        <pre style="max-height: 200px; overflow: auto;">{{ JSON.stringify(invitesReceived, null, 2) }}</pre>
+        <summary>Invites Received Filtered ({{ availableInvites.length }})</summary>
+        <pre style="max-height: 200px; overflow: auto;">{{ JSON.stringify(availableInvites, null, 2) }}</pre>
       </details>
     </div>
 
