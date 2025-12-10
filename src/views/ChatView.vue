@@ -215,6 +215,17 @@ async function sendMessage() {
   newMessage.value = ''
   sending.value = true
 
+  // Optimistically add the message to the UI
+  const tempMessage: MessageState = {
+    _id: `temp-${Date.now()}`,
+    threadId: threadId.value,
+    sender: currentUserId.value,
+    timestamp: new Date(),
+    content: content,
+    status: 'delivered'
+  }
+  messages.value.push(tempMessage)
+
   try {
     const result = await ApiService.callConceptAction<{ message?: string } | { error: string }>(
       'Messaging',
@@ -228,16 +239,26 @@ async function sendMessage() {
 
     if ('error' in result) {
       messagesError.value = result.error
-      // Restore the message text so user can try again
+      // Remove the optimistic message and restore the text
+      messages.value = messages.value.filter(m => m._id !== tempMessage._id)
       newMessage.value = content
     } else {
-      // Reload messages to show the new one
-      await loadMessages()
+      // Replace the temp message with the real one if we got a message ID
+      if (result.message) {
+        const messageIndex = messages.value.findIndex(m => m._id === tempMessage._id)
+        if (messageIndex !== -1) {
+          messages.value[messageIndex] = {
+            ...tempMessage,
+            _id: result.message
+          }
+        }
+      }
     }
   } catch (e: any) {
     console.error('Failed to send message:', e)
     messagesError.value = e?.response?.data?.error || e?.message || 'Failed to send message.'
-    // Restore the message text so user can try again
+    // Remove the optimistic message and restore the text
+    messages.value = messages.value.filter(m => m._id !== tempMessage._id)
     newMessage.value = content
   } finally {
     sending.value = false
