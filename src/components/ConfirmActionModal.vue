@@ -39,90 +39,158 @@ function onConfirm() {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .modal-content {
-  background: #F9FAFB;
-  border-radius: 18px;
-  max-width: 400px;
-  width: 100%;
-  padding: 2rem 1.5rem 1.5rem 1.5rem;
+  background: #FFFFFF;
+  border-radius: 24px;
+  max-width: 450px;
+  width: 90%;
+  padding: 2.5rem 2rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  animation: slideUp 0.3s ease-out;
+  position: relative;
 }
+
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--color-primary-light);
 }
+
 .modal-header h2 {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   color: var(--color-primary);
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
+
 .close-button {
-  background: none;
+  background: var(--color-primary-light);
   border: none;
-  font-size: 2rem;
+  font-size: 1.5rem;
   color: var(--color-primary);
   cursor: pointer;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  line-height: 1;
+  padding: 0;
 }
+
 .close-button:hover {
-  background: var(--color-primary-light);
+  background: var(--color-primary);
+  color: #fff;
+  transform: rotate(90deg);
 }
+
 .modal-body {
-  color: var(--color-primary);
-  font-size: 1.05rem;
-  margin-bottom: 1.5rem;
+  color: var(--color-secondary);
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+  line-height: 1.6;
 }
+
+.modal-body p {
+  margin: 0;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
   margin-top: 2rem;
 }
+
 .confirm-button {
   background: var(--color-accent);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 0.6rem 1.3rem;
+  border-radius: 10px;
+  padding: 0.75rem 1.8rem;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
+
+.confirm-button:hover {
+  background: var(--color-accent-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.confirm-button:active {
+  transform: translateY(0);
+}
+
 .confirm-button.danger {
   background: var(--color-error);
   color: #fff;
 }
+
 .confirm-button.danger:hover {
   background: #c62424;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(211, 47, 47, 0.3);
 }
+
 .cancel-button {
-  background: transparent;
+  background: #fff;
   color: var(--color-primary);
-  border: 1.5px solid var(--color-primary-border);
-  border-radius: 8px;
-  padding: 0.6rem 1.3rem;
+  border: 2px solid var(--color-primary-border);
+  border-radius: 10px;
+  padding: 0.75rem 1.8rem;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
+
 .cancel-button:hover {
   background: var(--color-primary-light);
   border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.cancel-button:active {
+  transform: translateY(0);
 }
 </style>
