@@ -88,6 +88,17 @@
         </div>
       </div>
     </div>
+
+    <!-- Cancel Run Confirmation Modal -->
+    <ConfirmActionModal
+      v-if="showCancelRunModal"
+      title="Cancel Run"
+      message="Are you sure you want to cancel this run?"
+      confirm-text="Cancel Run"
+      confirm-class="danger"
+      @close="closeCancelRunModal"
+      @confirm="confirmCancelRun"
+    />
   </section>
 </template>
 
@@ -97,6 +108,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useOneRunMatchingStore, type Run, type Invite } from '../stores/oneRunMatching'
 import { useAuthStore } from '../stores/auth'
 import { ApiService } from '../services/api'
+import ConfirmActionModal from '../components/ConfirmActionModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -110,6 +122,7 @@ const invite = ref<Invite | null>(null)
 const completingRun = ref(false)
 const cancellingRun = ref(false)
 const loadingThread = ref(false)
+const showCancelRunModal = ref(false)
 const userAName = ref('Loading...')
 const userBName = ref('Loading...')
 const userAUsername = ref('')
@@ -311,10 +324,13 @@ async function handleCompleteRun() {
   }
 }
 
-async function handleCancelRun() {
+function handleCancelRun() {
   if (!run.value || cancellingRun.value) return
-  
-  if (!confirm('Are you sure you want to cancel this run?')) return
+  showCancelRunModal.value = true
+}
+
+async function confirmCancelRun() {
+  if (!run.value) return
   
   cancellingRun.value = true
   try {
@@ -327,7 +343,12 @@ async function handleCancelRun() {
     }
   } finally {
     cancellingRun.value = false
+    showCancelRunModal.value = false
   }
+}
+
+function closeCancelRunModal() {
+  showCancelRunModal.value = false
 }
 
 async function handleGoToMessages() {
