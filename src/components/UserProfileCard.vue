@@ -67,19 +67,6 @@ const props = defineProps({
   hasMutualMatch: { type: Boolean, default: false },
 })
 
-// Computed property to ensure reactivity
-const showUnmatchButton = computed(() => {
-  const result = props.hasMutualMatch === true
-  console.log('[UserProfileCard] showUnmatchButton computed for:', props.profile.displayname, '=', result, 'hasMutualMatch:', props.hasMutualMatch)
-  return result
-})
-
-// Debug: Watch hasMutualMatch prop
-watch(() => props.hasMutualMatch, (newVal, oldVal) => {
-  console.log('[UserProfileCard] hasMutualMatch changed for:', props.profile.displayname, 'from', oldVal, 'to', newVal)
-  console.log('[UserProfileCard] Props:', { hasMutualMatch: props.hasMutualMatch, hasThumbsUp: props.hasThumbsUp })
-}, { immediate: true })
-
 const emit = defineEmits(['send-invite', 'chat', 'show-profile', 'unmatch'])
 
 const profileImageUrl = computed(() => {

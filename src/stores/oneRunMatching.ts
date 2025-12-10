@@ -168,8 +168,6 @@ export const useOneRunMatchingStore = defineStore('oneRunMatching', () => {
         }
       )
 
-      console.log('[OneRunMatching] acceptInvite response:', result)
-
       if (result?.error) {
         error.value = result.error
         return { error: result.error }

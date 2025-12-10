@@ -156,14 +156,6 @@ const hasActiveMatch = computed(() => {
   // which should NOT include one-time run matches
   const hasPartnerMatch = idVariants.some(id => {
     const matchId = activeMatchIds.value.get(id)
-    if (matchId) {
-      console.log('[MessagesView] Found partner match for thread:', {
-        threadId: currentThread._id,
-        otherUserId,
-        matchId,
-        idVariants
-      })
-    }
     return !!matchId
   })
   
@@ -333,18 +325,9 @@ async function findRunMatch() {
   const otherUserProfile = userProfiles.value[otherUserId]
   const otherUserUsername = otherUserProfile?.username || ''
   
-  console.log('[MessagesView] findRunMatch called', {
-    currentUserId: currentUserId.value,
-    currentUsername: auth.user?.username,
-    otherUserId,
-    otherUserUsername
-  })
-  
   try {
     // Fetch runs to check for matches
     await oneRunStore.fetchMatches()
-    
-    console.log('[MessagesView] Checking runs:', oneRunStore.runs.length)
     
     // Find a run where both users are participants
     // Handle both username and UUID formats
@@ -361,21 +344,13 @@ async function findRunMatch() {
       
       const matches = (currentMatchesA && otherMatchesB) || (currentMatchesB && otherMatchesA)
       
-      console.log('[MessagesView] Checking run:', run._id, {
-        runUserA: run.userA,
-        runUserB: run.userB,
-        matches
-      })
-      
       return matches
     })
     
     if (matchingRun) {
       runId.value = matchingRun._id
-      console.log('[MessagesView] ✅ Found matching run:', matchingRun._id)
     } else {
       runId.value = null
-      console.log('[MessagesView] ❌ No matching run found')
     }
   } catch (e) {
     console.error('[MessagesView] Failed to find run match:', e)
@@ -521,7 +496,6 @@ async function loadActiveMatches() {
     })
     
     activeMatchIds.value = newMatchIds
-    console.log('[MessagesView] Loaded active matches:', Array.from(newMatchIds.entries()))
   } catch (e) {
     console.warn('[MessagesView] Failed to load active matches:', e)
   }

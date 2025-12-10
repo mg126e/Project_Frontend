@@ -100,8 +100,7 @@ async function fetchThreadInfo() {
       thread.value = foundThread
       // Determine the other user ID
       otherUserId.value = thread.value.userA === currentUserId.value ? thread.value.userB : thread.value.userA
-      console.log('[ChatView] Found thread, otherUserId:', otherUserId.value)
-      
+
       // Fetch the other user's profile
       await fetchUserProfile(otherUserId.value)
     } else {
@@ -116,7 +115,6 @@ async function fetchThreadInfo() {
     if (!otherUserName.value && messages.value.length > 0) {
       const inferredOtherUserId = messages.value.find(m => m.sender !== currentUserId.value)?.sender
       if (inferredOtherUserId) {
-        console.log('[ChatView] Inferred otherUserId from messages:', inferredOtherUserId)
         otherUserId.value = inferredOtherUserId
         await fetchUserProfile(inferredOtherUserId)
       }

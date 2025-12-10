@@ -236,7 +236,6 @@ async function confirmSendInvite() {
       allRecipientIdVariants.forEach(id => {
         suggestionIds.value.set(id, suggestionId)
       })
-      console.log('[confirmSendInvite] Stored suggestion ID:', suggestionId, 'for recipient:', recipientId)
     }
     
     // Check if response indicates a mutual match was created
@@ -297,9 +296,7 @@ async function handleUnsendRequest(profile) {
       error.value = 'User ID not found'
       return
     }
-    
-    console.log('[handleUnsendRequest] Looking up suggestion ID for candidate:', candidateId, 'recipient:', recipientId)
-    
+
     // First, try to get suggestion ID from cache
     let suggestionId: string | undefined = suggestionIds.value.get(recipientId)
     
@@ -320,7 +317,6 @@ async function handleUnsendRequest(profile) {
         }
         
         if (suggestionId) {
-          console.log('[handleUnsendRequest] Found suggestion ID via API:', suggestionId)
           // Cache it for future use
           suggestionIds.value.set(recipientId, suggestionId)
         } else {
@@ -330,10 +326,7 @@ async function handleUnsendRequest(profile) {
         console.error('[handleUnsendRequest] Error fetching suggestion ID from API:', apiError)
         // Continue - we'll try to update local state anyway
       }
-    } else {
-      console.log('[handleUnsendRequest] Using cached suggestion ID:', suggestionId)
     }
-    
     // If we have a suggestion ID, call declineSuggestion
     if (suggestionId) {
       await ApiService.callConceptAction('PartnerMatching', 'declineSuggestion', {
@@ -341,7 +334,6 @@ async function handleUnsendRequest(profile) {
         recipient: recipientId,
         candidate: candidateId
       })
-      console.log('[handleUnsendRequest] Successfully declined suggestion:', suggestionId)
     } else {
       // If no suggestion ID found, the request might have already been declined, accepted, or expired
       console.warn('[handleUnsendRequest] No suggestion ID found - request may have already been processed')
@@ -503,7 +495,6 @@ async function confirmUnmatch() {
 
       if (matchingThread) {
         threadId = matchingThread._id || matchingThread.id
-        console.log('[confirmUnmatch] Found thread ID:', threadId)
       } else {
         console.warn('[confirmUnmatch] No thread found for users:', { currentUserId, otherUserId })
       }
@@ -526,7 +517,6 @@ async function confirmUnmatch() {
       const storedMatchId = activeMatchIds.value.get(id)
       if (storedMatchId) {
         matchId = storedMatchId
-        console.log('[confirmUnmatch] Found match ID from cache:', matchId, 'for user ID:', id)
         break
       }
     }
@@ -544,7 +534,6 @@ async function confirmUnmatch() {
           userA: currentUserId,
           userB: otherUserId
         })
-        console.log('[confirmUnmatch] Successfully unmatched users')
       } catch (e) {
         console.error('[confirmUnmatch] Error unmatching:', e)
         // Continue to delete chat even if unmatch fails
@@ -561,14 +550,11 @@ async function confirmUnmatch() {
           initiator: currentUserId,
           thread: threadId
         })
-        console.log('[confirmUnmatch] Deleted chat for current user')
-
         // Delete chat for other user
         await ApiService.callConceptAction('Messaging', 'deleteChat', {
           initiator: otherUserId,
           thread: threadId
         })
-        console.log('[confirmUnmatch] Deleted chat for other user')
       } catch (e) {
         console.error('[confirmUnmatch] Error deleting chat:', e)
         // Continue - chat might already be deleted
@@ -717,10 +703,6 @@ function getMutualMatchStatus(profile: any): boolean {
     return cached === true
   })
   
-  if (hasMatch) {
-    console.log('[getMutualMatchStatus] TRUE for profile:', profile.displayname, 'ID:', profileId, 'variants:', idVariants)
-  }
-  
   return hasMatch
 }
 
@@ -770,14 +752,9 @@ const profileMutualMatches = computed(() => {
       idVariants.forEach(id => {
         if (id) result[id] = hasMatch
       })
-      
-      if (hasMatch) {
-        console.log('[profileMutualMatches] TRUE for:', profile.displayname, 'ID:', profileId, 'variants:', idVariants)
-      }
     }
   })
   
-  console.log('[profileMutualMatches] Computed result:', result)
   return result
 })
 
@@ -971,10 +948,7 @@ async function fetchUsersInArea() {
         const matches = Array.isArray(matchesResult)
           ? matchesResult
           : matchesResult?.matches || []
-        
-        console.log('[fetchUsersInArea] Found active matches:', matches.length)
-        console.log('[fetchUsersInArea] Active matches data:', matches)
-        
+
         // Clear previous match data and prepare new maps
         const newCache = new Map<string, boolean>()
         const newMatchIds = new Map<string, string>()
@@ -1046,23 +1020,18 @@ async function fetchUsersInArea() {
                 }
               })
               
-              console.log('[fetchUsersInArea] Processed match for profile:', profile.displayname, 'matchId:', matchId, 'otherUser:', otherUser)
             } else {
               // Profile not loaded yet, but store the match ID anyway
               newMatchIds.set(otherUser, matchId)
               newCache.set(otherUser, true)
-              console.log('[fetchUsersInArea] Processed match for user (profile not loaded):', otherUser, 'matchId:', matchId)
             }
           }
         })
         
         // Replace the entire Map to trigger reactivity (Vue doesn't track Map mutations deeply)
         mutualMatchCache.value = newCache
-        activeMatchIds.value = newMatchIds
-        
-        console.log('[fetchUsersInArea] Active match IDs map:', Array.from(activeMatchIds.value.entries()))
-        console.log('[fetchUsersInArea] Mutual match cache:', Array.from(mutualMatchCache.value.entries()))
-      }
+        activeMatchIds.value = newMatchIds  
+       }
     } catch (e) {
       console.warn('[fetchUsersInArea] Error fetching active matches:', e)
     }
@@ -1098,9 +1067,7 @@ async function fetchSentThumbsUps() {
     // Then, try to get suggestion IDs from the new API
     try {
       const result = await ApiService.callConceptAction<any>('PartnerMatching', '_getThumbsUpsSentWithIds', { session })
-      
-      console.log('[fetchSentThumbsUps] _getThumbsUpsSentWithIds API response:', result)
-      
+
       // Response format: { suggestions: [{ suggestionId: "...", recipientId: "..." }, ...] }
       let suggestions: any[] = []
       if (result && typeof result === 'object' && 'suggestions' in result && Array.isArray(result.suggestions)) {
@@ -1108,8 +1075,6 @@ async function fetchSentThumbsUps() {
       } else if (Array.isArray(result)) {
         suggestions = result
       }
-      
-      console.log('[fetchSentThumbsUps] Parsed suggestions:', suggestions)
       
       // Extract user IDs and store suggestion IDs
       suggestions.forEach((suggestion: any) => {
@@ -1131,7 +1096,6 @@ async function fetchSentThumbsUps() {
           // Store suggestion ID mapped to recipient ID (the person who received the request)
           if (suggestionId) {
             suggestionIds.value.set(finalRecipientId, suggestionId)
-            console.log('[fetchSentThumbsUps] Stored suggestion ID:', suggestionId, 'for recipient:', finalRecipientId)
           } else {
             console.warn('[fetchSentThumbsUps] No suggestion ID found in suggestion:', suggestion)
           }
@@ -1146,8 +1110,6 @@ async function fetchSentThumbsUps() {
     
     // Update thumbsUpsSent with all user IDs we found
     thumbsUpsSent.value = new Set(userIds)
-    console.log('[fetchSentThumbsUps] Final suggestionIds map:', Array.from(suggestionIds.value.entries()))
-    console.log('[fetchSentThumbsUps] Final thumbsUpsSent set:', Array.from(thumbsUpsSent.value))
   } catch (e) {
     console.error('[fetchSentThumbsUps] Error:', e)
   }
