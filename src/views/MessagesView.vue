@@ -79,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useOneRunMatchingStore } from '../stores/oneRunMatching'
@@ -119,6 +119,7 @@ const messagesError = ref('')
 const newMessage = ref('')
 const sending = ref(false)
 const runId = ref<string | null>(null)
+let messagePollInterval: number | null = null
 
 // Unmatch functionality
 const activeMatchIds = ref(new Map<string, string>())
@@ -431,14 +432,39 @@ function formatTime(ts: Date | string): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+// Start polling for new messages
+function startMessagePolling() {
+  // Clear any existing interval
+  if (messagePollInterval) {
+    clearInterval(messagePollInterval)
+  }
+  
+  // Poll every 3 seconds for new messages
+  messagePollInterval = window.setInterval(() => {
+    if (selectedThreadId.value && !sending.value && !loadingMessages.value) {
+      loadMessagesForThread()
+    }
+  }, 3000)
+}
+
+// Stop polling for messages
+function stopMessagePolling() {
+  if (messagePollInterval) {
+    clearInterval(messagePollInterval)
+    messagePollInterval = null
+  }
+}
+
 // Watch for thread selection changes
 watch(selectedThreadId, async () => {
   if (selectedThreadId.value) {
     // Reload active matches to ensure we have the latest data
     await loadActiveMatches()
     loadMessagesForThread()
+    startMessagePolling()
   } else {
     runId.value = null
+    stopMessagePolling()
   }
 })
 
@@ -607,6 +633,14 @@ onMounted(async () => {
   // Load active matches
   await loadActiveMatches()
   loadThreads()
+  // Start polling for messages if a thread is selected
+  if (selectedThreadId.value) {
+    startMessagePolling()
+  }
+})
+
+onUnmounted(() => {
+  stopMessagePolling()
 })
 </script>
 
