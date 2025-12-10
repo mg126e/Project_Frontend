@@ -492,7 +492,6 @@ watch(activeRuns, async () => {
   background: white;
   border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: transform 0.2s, box-shadow 0.2s;
   display: flex;
   flex-direction: column;
@@ -502,7 +501,6 @@ watch(activeRuns, async () => {
 
 .run-card-dashboard:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .run-card-content h3 {
