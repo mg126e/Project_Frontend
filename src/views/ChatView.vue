@@ -32,7 +32,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { ApiService } from '../services/api'
@@ -69,7 +69,6 @@ const loadingMessages = ref(false)
 const messagesError = ref('')
 const newMessage = ref('')
 const sending = ref(false)
-let messagePollInterval: number | null = null
 
 async function fetchThreadInfo() {
   if (!threadId.value || !currentUserId.value) {
@@ -255,46 +254,15 @@ watch(threadId, () => {
   if (threadId.value) {
     otherUserId.value = ''
     fetchThreadInfo()
-    startMessagePolling()
-  } else {
-    stopMessagePolling()
   }
 })
-
-// Start polling for new messages
-function startMessagePolling() {
-  // Clear any existing interval
-  if (messagePollInterval) {
-    clearInterval(messagePollInterval)
-  }
-  
-  // Poll every 3 seconds for new messages
-  messagePollInterval = window.setInterval(() => {
-    if (threadId.value && !sending.value && !loadingMessages.value) {
-      loadMessages()
-    }
-  }, 3000)
-}
-
-// Stop polling for messages
-function stopMessagePolling() {
-  if (messagePollInterval) {
-    clearInterval(messagePollInterval)
-    messagePollInterval = null
-  }
-}
 
 onMounted(() => {
   if (threadId.value) {
     fetchThreadInfo()
-    startMessagePolling()
   } else {
     error.value = 'No thread ID provided'
   }
-})
-
-onUnmounted(() => {
-  stopMessagePolling()
 })
 </script>
 
