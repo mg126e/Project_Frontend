@@ -639,7 +639,6 @@ async function confirmRemoveMilestone() {
     await loadMilestones();
   } catch (e: any) {
     console.error('Failed to remove milestone:', e);
-    alert('Failed to remove milestone: ' + (e.message || 'Unknown error'));
   } finally {
     showConfirmModal.value = false;
     milestoneToRemove.value = null;
