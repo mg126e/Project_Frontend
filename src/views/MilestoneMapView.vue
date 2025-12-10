@@ -589,17 +589,24 @@ async function addMilestone() {
       photoFileId = confirmResult.file;
     }
 
+    // Use different endpoint paths based on whether there's a photo
+    const actionPath = photoFileId ? 'addMilestoneWithPhoto' : 'addMilestone';
+    const params: any = {
+      milestoneMapId: selectedMapId.value,
+      latitude: newMilestone.value.latitude,
+      longitude: newMilestone.value.longitude,
+      title: newMilestone.value.title,
+      description: newMilestone.value.description,
+    };
+
+    if (photoFileId) {
+      params.photoFileId = photoFileId;
+    }
+
     await ApiService.callConceptAction(
       'MilestoneMap',
-      'addMilestone',
-      {
-        milestoneMapId: selectedMapId.value,
-        latitude: newMilestone.value.latitude,
-        longitude: newMilestone.value.longitude,
-        title: newMilestone.value.title,
-        description: newMilestone.value.description,
-        ...(photoFileId && { photoFileId }),
-      }
+      actionPath,
+      params
     );
 
     closeAddMilestoneModal();
@@ -632,7 +639,6 @@ async function confirmRemoveMilestone() {
     await loadMilestones();
   } catch (e: any) {
     console.error('Failed to remove milestone:', e);
-    alert('Failed to remove milestone: ' + (e.message || 'Unknown error'));
   } finally {
     showConfirmModal.value = false;
     milestoneToRemove.value = null;

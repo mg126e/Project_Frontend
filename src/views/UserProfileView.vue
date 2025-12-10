@@ -376,14 +376,11 @@ function onLocationInput(event: Event) {
 async function onImageChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
-
-  try {
     // 1. Request upload URL WITHOUT contentType - let backend sign without content-type header
     const uploadReqResult = await profileStore.requestFileUpload(file.name);
     
     if ('error' in uploadReqResult) {
       console.error('[onImageChange] Error getting upload URL:', uploadReqResult.error);
-      alert('Failed to get upload URL: ' + uploadReqResult.error);
       return;
     }
     
@@ -432,13 +429,9 @@ async function onImageChange(e: Event) {
       }
     } catch (previewErr) {
       console.warn('[onImageChange] Could not load server URL, keeping local preview:', previewErr);
-    }
-    
-  } catch (err) {
-    console.error('[onImageChange] Exception during upload:', err);
-    alert('An error occurred while uploading the file: ' + (err instanceof Error ? err.message : String(err)));
+    } 
   }
-}
+
 
 async function saveProfile() {
   const p = editForm.value;
@@ -485,9 +478,7 @@ async function saveProfile() {
     await profileStore.fetchProfile();
     isEditMode.value = false;
   } catch (e) {
-    const errorMsg = e instanceof Error ? e.message : 'Failed to save profile.';
     console.error('[saveProfile] Error saving profile:', e);
-    alert(`Failed to save profile: ${errorMsg}`);
   } finally {
     savingProfile.value = false;
   }
