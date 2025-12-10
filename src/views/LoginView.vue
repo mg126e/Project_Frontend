@@ -83,8 +83,9 @@ async function onLogin() {
   font-weight: 600;
   font-size: 1.1rem;
   cursor: pointer;
-  margin-top: 1rem;
+  margin: 1rem auto 0;
   transition: background 0.2s;
+  display: block;
 }
 .btn-primary:disabled {
   opacity: 0.7;
