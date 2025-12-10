@@ -58,6 +58,7 @@ const route = useRoute()
 const auth = useAuthStore()
 const currentUserId = computed(() => auth.user?.id || '')
 const threadId = computed(() => route.params.threadId as string)
+const otherUserId = ref<string>('')
 
 const loading = ref(false)
 const error = ref('')
@@ -98,13 +99,14 @@ async function fetchThreadInfo() {
     if (foundThread) {
       thread.value = foundThread
       // Determine the other user ID
-      const otherUserId = thread.value.userA === currentUserId.value ? thread.value.userB : thread.value.userA
+      otherUserId.value = thread.value.userA === currentUserId.value ? thread.value.userB : thread.value.userA
+      console.log('[ChatView] Found thread, otherUserId:', otherUserId.value)
       
       // Fetch the other user's profile
-      await fetchUserProfile(otherUserId)
+      await fetchUserProfile(otherUserId.value)
     } else {
       // Thread not found in list, try to infer from messages
-      console.warn('Thread not found in threads list, will try to infer from messages')
+      console.warn('[ChatView] Thread not found in threads list, will try to infer from messages')
     }
     
     // Load messages (this will also help us infer the other user if thread wasn't found)
@@ -112,9 +114,11 @@ async function fetchThreadInfo() {
     
     // If we still don't have the other user's name, try to infer from messages
     if (!otherUserName.value && messages.value.length > 0) {
-      const otherUserId = messages.value.find(m => m.sender !== currentUserId.value)?.sender
-      if (otherUserId) {
-        await fetchUserProfile(otherUserId)
+      const inferredOtherUserId = messages.value.find(m => m.sender !== currentUserId.value)?.sender
+      if (inferredOtherUserId) {
+        console.log('[ChatView] Inferred otherUserId from messages:', inferredOtherUserId)
+        otherUserId.value = inferredOtherUserId
+        await fetchUserProfile(inferredOtherUserId)
       }
     }
   } catch (e: any) {
@@ -248,6 +252,7 @@ function formatTime(ts: Date | string): string {
 // Watch for route changes to reload when threadId changes
 watch(threadId, () => {
   if (threadId.value) {
+    otherUserId.value = ''
     fetchThreadInfo()
   }
 })

@@ -3,17 +3,45 @@
     <h1>Messages</h1>
     <div v-if="loading" class="loading">Loading threads...</div>
     <div v-else-if="error" class="error-msg">{{ error }}</div>
-    <div v-else>
-      <div class="user-select-row">
-        <label for="threadSelect" class="user-select-label">Select Conversation:</label>
-        <select id="threadSelect" v-model="selectedThreadId" class="user-select" @change="loadMessagesForThread">
-          <option value="">-- Select a conversation --</option>
-          <option v-for="thread in threads" :key="thread._id" :value="thread._id">
-            {{ getOtherUserName(thread) }}
-          </option>
-        </select>
+    <div v-else class="messages-layout">
+      <div class="threads-sidebar">
+        <h2 class="sidebar-title">Conversations</h2>
+        <div v-if="threads.length === 0" class="no-threads">
+          <p>No conversations yet</p>
+        </div>
+        <div v-else class="threads-list">
+          <button
+            v-for="thread in threads"
+            :key="thread._id"
+            @click="selectThread(thread._id)"
+            :class="['thread-item', { active: selectedThreadId === thread._id }]"
+          >
+            <div class="thread-name">{{ getOtherUserName(thread) }}</div>
+          </button>
+        </div>
       </div>
       <div v-if="selectedThreadId" class="messages-container">
+        <div class="messages-header">
+          <h2>{{ getOtherUserName(getCurrentThread()) }}</h2>
+          <div class="header-actions">
+            <button
+              v-if="hasActiveMatch"
+              class="btn-unmatch"
+              @click="handleUnmatchClick"
+              title="Unmatch with this user"
+            >
+              Unmatch
+            </button>
+            <router-link 
+              v-if="runId" 
+              :to="`/run/${runId}`" 
+              class="btn-view-run"
+              title="View Run Details"
+            >
+              View Run Details
+            </router-link>
+          </div>
+        </div>
         <div v-if="loadingMessages" class="loading">Loading messages...</div>
         <div v-else-if="messagesError" class="error-msg">{{ messagesError }}</div>
         <div v-else>
@@ -34,17 +62,29 @@
         </div>
       </div>
       <div v-else class="no-thread-selected">
-        <p>Select a conversation to view messages</p>
+        <p>Select a conversation from the sidebar to view messages</p>
       </div>
     </div>
+
+    <ConfirmActionModal
+      v-if="showUnmatchModal"
+      :title="'Unmatch'"
+      :message="unmatchModalMessage"
+      confirmText="Unmatch"
+      confirmClass="danger"
+      @close="showUnmatchModal = false"
+      @confirm="confirmUnmatch"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useOneRunMatchingStore } from '../stores/oneRunMatching'
 import { ApiService } from '../services/api'
+import ConfirmActionModal from '../components/ConfirmActionModal.vue'
 
 interface ThreadState {
   _id: string
@@ -64,7 +104,9 @@ interface MessageState {
 }
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
+const oneRunStore = useOneRunMatchingStore()
 const currentUserId = computed(() => auth.user?.id || '')
 
 const loading = ref(false)
@@ -76,6 +118,66 @@ const loadingMessages = ref(false)
 const messagesError = ref('')
 const newMessage = ref('')
 const sending = ref(false)
+const runId = ref<string | null>(null)
+
+// Unmatch functionality
+const activeMatchIds = ref(new Map<string, string>())
+const showUnmatchModal = ref(false)
+const unmatchModalMessage = computed(() => {
+  const currentThread = getCurrentThread()
+  if (!currentThread) return ''
+  const otherUserName = getOtherUserName(currentThread)
+  return `Are you sure you want to unmatch with ${otherUserName}? This will delete your conversation and you won't be able to message each other.`
+})
+
+// Check if current thread has an active partner match (NOT a one-time run match)
+const hasActiveMatch = computed(() => {
+  const currentThread = getCurrentThread()
+  if (!currentThread || !currentUserId.value) {
+    return false
+  }
+  
+  const otherUserId = currentThread.userA === currentUserId.value ? currentThread.userB : currentThread.userA
+  if (!otherUserId) {
+    return false
+  }
+  
+  // Check if the other user has an active PARTNER match ID stored
+  // activeMatchIds only contains partner matches from _getActiveMatches (PartnerMatching concept)
+  // This excludes one-time run matches
+  const idVariants = [
+    otherUserId,
+    currentThread.userA,
+    currentThread.userB
+  ].filter(Boolean)
+  
+  // Only return true if we have a match ID in activeMatchIds
+  // activeMatchIds is ONLY populated from PartnerMatching._getActiveMatches
+  // which should NOT include one-time run matches
+  const hasPartnerMatch = idVariants.some(id => {
+    const matchId = activeMatchIds.value.get(id)
+    if (matchId) {
+      console.log('[MessagesView] Found partner match for thread:', {
+        threadId: currentThread._id,
+        otherUserId,
+        matchId,
+        idVariants
+      })
+    }
+    return !!matchId
+  })
+  
+  // Also check: if there's a runId, this might be a one-time run match
+  // In that case, we should NOT show the unmatch button
+  // (Partner matches don't have runId, one-time run matches do)
+  if (runId.value && hasPartnerMatch) {
+    console.warn('[MessagesView] Thread has both runId and partner match - this should not happen')
+  }
+  
+  // Only show unmatch if there's a partner match AND no runId
+  // (runId indicates it's a one-time run match, not a partner match)
+  return hasPartnerMatch && !runId.value
+})
 
 // User profile cache to avoid repeated API calls
 const userProfiles = ref<Record<string, { displayname?: string; username?: string }>>({})
@@ -183,6 +285,7 @@ async function loadThreads() {
 async function loadMessagesForThread() {
   if (!selectedThreadId.value || !currentUserId.value) {
     messages.value = []
+    runId.value = null
     return
   }
 
@@ -207,12 +310,76 @@ async function loadMessagesForThread() {
     } else {
       messages.value = []
     }
+    
+    // Check for run match after loading messages
+    await findRunMatch()
   } catch (e: any) {
     console.error('Failed to load messages:', e)
     messagesError.value = e?.response?.data?.error || e?.message || 'Failed to load messages.'
     messages.value = []
   } finally {
     loadingMessages.value = false
+  }
+}
+
+async function findRunMatch() {
+  const currentThread = getCurrentThread()
+  if (!currentThread || !currentUserId.value) {
+    runId.value = null
+    return
+  }
+  
+  const otherUserId = currentThread.userA === currentUserId.value ? currentThread.userB : currentThread.userA
+  const otherUserProfile = userProfiles.value[otherUserId]
+  const otherUserUsername = otherUserProfile?.username || ''
+  
+  console.log('[MessagesView] findRunMatch called', {
+    currentUserId: currentUserId.value,
+    currentUsername: auth.user?.username,
+    otherUserId,
+    otherUserUsername
+  })
+  
+  try {
+    // Fetch runs to check for matches
+    await oneRunStore.fetchMatches()
+    
+    console.log('[MessagesView] Checking runs:', oneRunStore.runs.length)
+    
+    // Find a run where both users are participants
+    // Handle both username and UUID formats
+    const matchingRun = oneRunStore.runs.find(run => {
+      const currentUserIdMatches = currentUserId.value
+      const currentUsernameMatches = auth.user?.username || ''
+      const otherUserIdMatches = otherUserId
+      const otherUsernameMatches = otherUserUsername
+      
+      const currentMatchesA = run.userA === currentUserIdMatches || run.userA === currentUsernameMatches
+      const currentMatchesB = run.userB === currentUserIdMatches || run.userB === currentUsernameMatches
+      const otherMatchesA = run.userA === otherUserIdMatches || run.userA === otherUsernameMatches
+      const otherMatchesB = run.userB === otherUserIdMatches || run.userB === otherUsernameMatches
+      
+      const matches = (currentMatchesA && otherMatchesB) || (currentMatchesB && otherMatchesA)
+      
+      console.log('[MessagesView] Checking run:', run._id, {
+        runUserA: run.userA,
+        runUserB: run.userB,
+        matches
+      })
+      
+      return matches
+    })
+    
+    if (matchingRun) {
+      runId.value = matchingRun._id
+      console.log('[MessagesView] ✅ Found matching run:', matchingRun._id)
+    } else {
+      runId.value = null
+      console.log('[MessagesView] ❌ No matching run found')
+    }
+  } catch (e) {
+    console.error('[MessagesView] Failed to find run match:', e)
+    runId.value = null
   }
 }
 
@@ -254,31 +421,285 @@ async function sendMessage() {
   }
 }
 
+function selectThread(threadId: string) {
+  selectedThreadId.value = threadId
+  loadMessagesForThread()
+}
+
 function formatTime(ts: Date | string): string {
   const d = typeof ts === 'string' ? new Date(ts) : ts
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-onMounted(() => {
+// Watch for thread selection changes
+watch(selectedThreadId, async () => {
+  if (selectedThreadId.value) {
+    // Reload active matches to ensure we have the latest data
+    await loadActiveMatches()
+    loadMessagesForThread()
+  } else {
+    runId.value = null
+  }
+})
+
+// Watch for changes in active runs
+watch(() => oneRunStore.runs, () => {
+  if (selectedThreadId.value) {
+    findRunMatch()
+  }
+}, { deep: true })
+
+// Load active matches to determine which conversations have unmatch option
+async function loadActiveMatches() {
+  if (!currentUserId.value) return
+  
+  try {
+    const matchesResult = await ApiService.callConceptAction<any>(
+      'PartnerMatching',
+      '_getActiveMatches',
+      { user: currentUserId.value }
+    )
+    
+    const matches = Array.isArray(matchesResult)
+      ? matchesResult
+      : matchesResult?.matches || []
+    
+    const newMatchIds = new Map<string, string>()
+    
+    matches.forEach((match: any) => {
+      const matchId = match._id || match.id
+      if (!matchId) return
+      
+      let userA: string | undefined
+      let userB: string | undefined
+      
+      if (match.userA && match.userB) {
+        userA = match.userA
+        userB = match.userB
+      } else if (Array.isArray(match.users) && match.users.length >= 2) {
+        userA = match.users[0]
+        userB = match.users[1]
+      }
+      
+      if (!userA || !userB) return
+      
+      const currentUserIdVariants = [
+        currentUserId.value,
+        auth.user?.id,
+        auth.user?.username
+      ].filter(Boolean)
+      
+      const otherUser = currentUserIdVariants.includes(userA) ? userB : userA
+      
+      if (otherUser) {
+        newMatchIds.set(otherUser, matchId)
+        // Also store with all possible ID variants
+        newMatchIds.set(userA, matchId)
+        newMatchIds.set(userB, matchId)
+      }
+    })
+    
+    activeMatchIds.value = newMatchIds
+    console.log('[MessagesView] Loaded active matches:', Array.from(newMatchIds.entries()))
+  } catch (e) {
+    console.warn('[MessagesView] Failed to load active matches:', e)
+  }
+}
+
+function handleUnmatchClick() {
+  showUnmatchModal.value = true
+}
+
+async function confirmUnmatch() {
+  const currentThread = getCurrentThread()
+  if (!currentThread || !currentUserId.value) {
+    showUnmatchModal.value = false
+    return
+  }
+
+  const otherUserId = currentThread.userA === currentUserId.value ? currentThread.userB : currentThread.userA
+  if (!otherUserId) {
+    error.value = 'Missing user information'
+    showUnmatchModal.value = false
+    return
+  }
+
+  try {
+    const session = auth.session
+    if (!session) {
+      error.value = 'Session not found'
+      showUnmatchModal.value = false
+      return
+    }
+
+    // Get match ID from stored active matches
+    const idVariants = [
+      otherUserId,
+      currentThread.userA,
+      currentThread.userB
+    ].filter(Boolean)
+    
+    let matchId: string | undefined
+    for (const id of idVariants) {
+      const storedMatchId = activeMatchIds.value.get(id)
+      if (storedMatchId) {
+        matchId = storedMatchId
+        break
+      }
+    }
+
+    if (!matchId) {
+      error.value = 'No active match found'
+      showUnmatchModal.value = false
+      return
+    }
+
+    // Step 1: Unmatch the users
+    await ApiService.callConceptAction('PartnerMatching', 'unmatch', {
+      activeMatch: matchId,
+      userA: currentUserId.value,
+      userB: otherUserId
+    })
+
+    // Step 2: Delete chat for both users
+    const threadId = selectedThreadId.value
+    if (threadId) {
+      // Delete chat for current user
+      await ApiService.callConceptAction('Messaging', 'deleteChat', {
+        initiator: currentUserId.value,
+        thread: threadId
+      })
+
+      // Delete chat for other user
+      await ApiService.callConceptAction('Messaging', 'deleteChat', {
+        initiator: otherUserId,
+        thread: threadId
+      })
+    }
+
+    showUnmatchModal.value = false
+    
+    // Remove from active matches
+    const newMatchIds = new Map(activeMatchIds.value)
+    idVariants.forEach(id => newMatchIds.delete(id))
+    activeMatchIds.value = newMatchIds
+    
+    // Clear selected thread and reload threads
+    selectedThreadId.value = ''
+    await loadThreads()
+    
+    // Navigate away or show message
+    error.value = ''
+  } catch (e) {
+    console.error('[MessagesView] Error unmatching:', e)
+    error.value = e instanceof Error ? e.message : 'Failed to unmatch'
+    showUnmatchModal.value = false
+  }
+}
+
+onMounted(async () => {
+  // Pre-fetch runs
+  try {
+    await oneRunStore.fetchMatches()
+  } catch (e) {
+    console.warn('[MessagesView] Failed to pre-fetch runs:', e)
+  }
+  // Load active matches
+  await loadActiveMatches()
   loadThreads()
 })
 </script>
 
 <style scoped>
 .messages-page {
-  min-width: 800px;
+  min-width: 1000px;
   background: #F9FAFB;
   border-radius: 24px;
   padding: 3.5rem 4.5rem 3.5rem 4.5rem;
 }
-.messages-container {
+
+.messages-layout {
+  display: flex;
+  gap: 1.5rem;
+  height: 800px;
+}
+
+.threads-sidebar {
+  width: 280px;
+  background: #fff;
+  border: 1.5px solid var(--color-primary-border);
+  border-radius: 12px;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  height: 800px;
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  color: var(--color-primary);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-primary-border);
+}
+
+.threads-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.thread-item {
+  background: transparent;
+  border: 1.5px solid var(--color-primary-border);
+  border-radius: 8px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  width: 100%;
+}
+
+.thread-item:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.thread-item.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.thread-item.active .thread-name {
+  color: white;
+  font-weight: 600;
+}
+
+.thread-name {
+  color: var(--color-primary);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.no-threads {
+  text-align: center;
+  padding: 2rem;
+  color: #888;
+  font-style: italic;
+}
+.messages-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   border: 1.5px solid var(--color-primary-border);
   border-radius: 12px;
   background: #f7fafd;
   padding: 1.2rem;
+  min-width: 0;
 }
 .messages-list {
   flex: 1;
@@ -314,33 +735,65 @@ onMounted(() => {
   color: #888;
   text-align: right;
 }
-.user-select-row {
+.messages-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-primary-border);
+}
+
+.header-actions {
   display: flex;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 1.5rem;
 }
-.user-select-label {
-  font-weight: 600;
+
+.messages-header h2 {
   color: var(--color-primary);
-  font-size: 1rem;
+  font-size: 1.5rem;
+  margin: 0;
 }
-.user-select {
-  background: #f7fafd;
-  color: var(--color-primary);
-  border: 1.5px solid var(--color-primary-border);
+
+.btn-view-run {
+  background: var(--color-accent);
+  color: white;
+  border: none;
   border-radius: 6px;
-  padding: 0.45em 1.2em 0.45em 0.8em;
+  padding: 0.6em 1.2em;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.95rem;
   cursor: pointer;
-  transition: border 0.18s;
-  outline: none;
-  min-width: 200px;
+  transition: background 0.2s;
+  text-decoration: none;
+  white-space: nowrap;
 }
-.user-select:focus {
-  border-color: var(--color-primary-dark);
+
+.btn-view-run:hover {
+  background: var(--color-accent-dark);
 }
+
+.btn-unmatch {
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6em 1.2em;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-unmatch:hover {
+  background: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
 .message-input-form {
   display: flex;
   gap: 0.7rem;

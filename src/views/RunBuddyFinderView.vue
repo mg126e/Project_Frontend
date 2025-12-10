@@ -165,6 +165,17 @@
     <div v-if="!loading && !invitesCreated.length && !availableInvites.length && !activeRuns.length" class="empty-state">
       <p>No invites or runs yet. Create your first invite to find a running buddy!</p>
     </div>
+
+    <!-- Cancel Run Confirmation Modal -->
+    <ConfirmActionModal
+      v-if="showCancelRunModal"
+      title="Cancel Run"
+      message="Are you sure you want to cancel this run?"
+      confirm-text="Cancel Run"
+      confirm-class="danger"
+      @close="closeCancelRunModal"
+      @confirm="confirmCancelRun"
+    />
   </section>
 </template>
 
@@ -174,6 +185,7 @@ import { useOneRunMatchingStore, type Invite } from '../stores/oneRunMatching'
 import { useProfileStore } from '../stores/profile'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
+import ConfirmActionModal from '../components/ConfirmActionModal.vue'
 
 const router = useRouter()
 const oneRunStore = useOneRunMatchingStore()
@@ -184,6 +196,8 @@ const loading = ref(false)
 const creatingInvite = ref(false)
 const sendingInvite = ref<string | null>(null)
 const processingInvite = ref<string | null>(null)
+const showCancelRunModal = ref(false)
+const runToCancel = ref<string | null>(null)
 
 const newInvite = ref({
   distance: 3.0,
@@ -392,15 +406,29 @@ async function handleCompleteRun(runId: string) {
   }
 }
 
-async function handleCancelRun(runId: string) {
-  if (!confirm('Are you sure you want to cancel this run?')) return
-  const result = await oneRunStore.cancelRun(runId)
+function handleCancelRun(runId: string) {
+  runToCancel.value = runId
+  showCancelRunModal.value = true
+}
+
+async function confirmCancelRun() {
+  if (!runToCancel.value) return
+  
+  const result = await oneRunStore.cancelRun(runToCancel.value)
   if (!result.success && result.error) {
     alert(result.error)
   } else {
     // Refresh data to update the UI after cancellation
     await loadData()
   }
+  
+  showCancelRunModal.value = false
+  runToCancel.value = null
+}
+
+function closeCancelRunModal() {
+  showCancelRunModal.value = false
+  runToCancel.value = null
 }
 
 async function loadData() {

@@ -8,6 +8,7 @@
       <div class="modal-body">
         <p>{{ message }}</p>
         <div class="modal-actions">
+          <button class="cancel-button" @click="onClose">Cancel</button>
           <button :class="['confirm-button', confirmClass]" @click="onConfirm">{{ confirmText }}</button>
         </div>
       </div>
@@ -108,5 +109,20 @@ function onConfirm() {
 }
 .confirm-button.danger:hover {
   background: #c62424;
+}
+.cancel-button {
+  background: transparent;
+  color: var(--color-primary);
+  border: 1.5px solid var(--color-primary-border);
+  border-radius: 8px;
+  padding: 0.6rem 1.3rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.cancel-button:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
 }
 </style>

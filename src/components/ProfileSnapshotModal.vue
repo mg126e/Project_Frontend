@@ -6,33 +6,54 @@
         <img :src="profileImageUrl" class="profile-avatar" alt="Profile avatar" />
         <div>
           <h2 class="profile-name">{{ profile.displayname }}</h2>
-          <p class="profile-bio">{{ profile.bio }}</p>
+          <p v-if="profile.username" class="profile-username">@{{ profile.username }}</p>
+          <p class="profile-bio">{{ profile.bio || 'No bio available' }}</p>
         </div>
       </div>
-      <div class="profile-meta">
-        <span><b>Location:</b> {{ profile.location }}</span>
-      </div>
-      <div class="profile-tags">
-        <span class="tag">{{ profile.tags.gender }}</span>
-        <span class="tag">{{ profile.tags.age }}</span>
-        <span class="tag">{{ profile.tags.runningLevel }}</span>
-        <span class="tag">{{ profile.tags.runningPace }} min/mi</span>
-        <span class="tag">{{ profile.tags.personality }}</span>
+      <div class="profile-details">
+        <div class="profile-detail-row">
+          <span class="detail-label">Location:</span>
+          <span class="detail-value">{{ profile.location || 'Not specified' }}</span>
+        </div>
+        <div class="profile-detail-row">
+          <span class="detail-label">Gender:</span>
+          <span class="detail-value">{{ profile.tags?.gender || 'Not specified' }}</span>
+        </div>
+        <div class="profile-detail-row">
+          <span class="detail-label">Age:</span>
+          <span class="detail-value">{{ profile.tags?.age || 'Not specified' }}</span>
+        </div>
+        <div class="profile-detail-row">
+          <span class="detail-label">Running Level:</span>
+          <span class="detail-value">{{ profile.tags?.runningLevel || 'Not specified' }}</span>
+        </div>
+        <div class="profile-detail-row">
+          <span class="detail-label">Running Pace:</span>
+          <span class="detail-value">{{ profile.tags?.runningPace ? `${profile.tags.runningPace} min/mi` : 'Not specified' }}</span>
+        </div>
+        <div class="profile-detail-row">
+          <span class="detail-label">Personality:</span>
+          <span class="detail-value">{{ profile.tags?.personality || 'Not specified' }}</span>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   profile: { type: Object, required: true },
   show: { type: Boolean, default: false },
 });
 const emit = defineEmits(['close']);
 
-const profileImageUrl =
-  props.profile.profileImageUrl ||
-  'https://media.istockphoto.com/id/628317758/vector/fit-couple-running-a-marathon-together.jpg?s=612x612&w=0&k=20&c=q9adFDtuz7CkLSb-u9U_ykVQdD0aBuWEHbtoCvJ94rQ=';
+const profileImageUrl = computed(() => {
+  return props.profile.profileImage || 
+         props.profile.profileImageUrl || 
+         'https://media.istockphoto.com/id/628317758/vector/fit-couple-running-a-marathon-together.jpg?s=612x612&w=0&k=20&c=q9adFDtuz7CkLSb-u9U_ykVQdD0aBuWEHbtoCvJ94rQ='
+})
 
 function close() {
   emit('close');
@@ -90,28 +111,40 @@ function close() {
   font-weight: 700;
   color: var(--color-primary);
 }
+.profile-username {
+  margin: 0.2rem 0 0 0;
+  color: #888;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
 .profile-bio {
-  margin: 0.3rem 0 0 0;
+  margin: 0.5rem 0 0 0;
   color: #555;
   font-size: 1.05rem;
+  line-height: 1.5;
 }
-.profile-meta {
-  color: #888;
-  font-size: 1rem;
-  margin-bottom: 0.7rem;
+.profile-details {
+  margin-top: 1.2rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--color-primary-border);
 }
-.profile-tags {
+.profile-detail-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin-bottom: 0.7rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.8rem;
+  gap: 1rem;
 }
-.tag {
-  background: var(--color-primary-light);
-  color: var(--color-primary);
-  border-radius: 6px;
-  padding: 0.22em 0.9em;
-  font-size: 0.98rem;
+.detail-label {
   font-weight: 600;
+  color: var(--color-primary);
+  font-size: 0.95rem;
+  min-width: 120px;
+}
+.detail-value {
+  color: #555;
+  font-size: 0.95rem;
+  text-align: right;
+  flex: 1;
 }
 </style>

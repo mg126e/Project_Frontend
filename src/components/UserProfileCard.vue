@@ -1,10 +1,23 @@
 <template>
   <div class="profile-card">
-    <img
-      class="profile-avatar"
-      :src="profileImageUrl"
-      alt="User avatar"
-    />
+    <div class="profile-avatar-section">
+      <img
+        class="profile-avatar"
+        :src="profileImageUrl"
+        alt="User avatar"
+        @click="handleImageClick"
+        style="cursor: pointer;"
+      />
+      <!-- Unmatch button under profile picture (only when matched) -->
+      <button
+        v-if="hasMutualMatch"
+        class="unmatch-btn"
+        @click="handleUnmatchClick"
+        title="Unmatch with this user"
+      >
+        Unmatch
+      </button>
+    </div>
     <div class="profile-info">
       <div class="profile-header-row">
         <h2 class="profile-name">{{ profile.displayname }}</h2>
@@ -21,14 +34,14 @@
         <span class="tag">{{ profile.tags.personality }}</span>
       </div>
       <div class="action-buttons">
-        <!-- Show messaging button when there's a mutual match -->
+        <!-- Show message button when there's a mutual match -->
         <button
           v-if="hasMutualMatch"
           class="message-btn"
           @click="handleChatClick"
           title="Message your match"
         >
-          💬 Message
+          Message
         </button>
         <!-- Show send request button when no mutual match yet -->
         <button 
@@ -46,7 +59,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   profile: { type: Object, required: true },
@@ -54,7 +67,20 @@ const props = defineProps({
   hasMutualMatch: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['send-invite', 'chat'])
+// Computed property to ensure reactivity
+const showUnmatchButton = computed(() => {
+  const result = props.hasMutualMatch === true
+  console.log('[UserProfileCard] showUnmatchButton computed for:', props.profile.displayname, '=', result, 'hasMutualMatch:', props.hasMutualMatch)
+  return result
+})
+
+// Debug: Watch hasMutualMatch prop
+watch(() => props.hasMutualMatch, (newVal, oldVal) => {
+  console.log('[UserProfileCard] hasMutualMatch changed for:', props.profile.displayname, 'from', oldVal, 'to', newVal)
+  console.log('[UserProfileCard] Props:', { hasMutualMatch: props.hasMutualMatch, hasThumbsUp: props.hasThumbsUp })
+}, { immediate: true })
+
+const emit = defineEmits(['send-invite', 'chat', 'show-profile', 'unmatch'])
 
 const profileImageUrl = computed(() => {
   return props.profile.profileImage || 
@@ -69,6 +95,14 @@ function handleThumbsUpClick() {
 function handleChatClick() {
   const profileId = props.profile._id || props.profile.userId
   emit('chat', profileId)
+}
+
+function handleImageClick() {
+  emit('show-profile', props.profile)
+}
+
+function handleUnmatchClick() {
+  emit('unmatch', props.profile)
 }
 </script>
 
@@ -91,10 +125,18 @@ function handleChatClick() {
 .profile-card:hover {
   border: 1.5px solid var(--color-primary);
 }
+.profile-avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
 .profile-avatar {
   width: 100px;
   height: 100px;
-  min-width: 100px;
   flex-shrink: 0;
   border-radius: 50%;
   object-fit: cover;
@@ -246,6 +288,30 @@ function handleChatClick() {
 
 .message-btn:hover {
   background: var(--color-primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.unmatch-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5em 1.2em;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 100px;
+}
+
+.unmatch-btn:hover {
+  background: #c82333;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }

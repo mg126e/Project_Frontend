@@ -1,6 +1,7 @@
 <template>
   <section class="partner-matching-page">
     <h1>Find a Running Partner</h1>
+    <p class="page-description">Send a request and if you match you can message and set up runs together!</p>
     
     <div v-if="error" class="error-banner">
       {{ error }}
@@ -51,9 +52,11 @@
           :key="p._id || p.userId"
           :profile="p"
           :has-thumbs-up="thumbsUpsSent.has(p._id || p.userId)"
-          :has-mutual-match="hasMutualMatch(p._id || p.userId)"
+          :has-mutual-match="getMutualMatchForProfile(p)"
           @send-invite="handleThumbsUp"
           @chat="navigateToChat"
+          @show-profile="handleShowProfile"
+          @unmatch="handleUnmatch"
         />
       </div>
     </template>
@@ -68,11 +71,29 @@
       @confirm="confirmSendInvite"
     />
 
+    <ConfirmActionModal
+      v-if="showUnmatchModal"
+      :title="'Unmatch'"
+      :message="unmatchModalMessage"
+      confirmText="Unmatch"
+      confirmClass="danger"
+      @close="showUnmatchModal = false"
+      @confirm="confirmUnmatch"
+    />
+
+    <ProfileSnapshotModal
+      v-if="showProfileModal && selectedProfile"
+      :profile="selectedProfile"
+      :show="showProfileModal"
+      @close="showProfileModal = false"
+    />
+
   </section>
 </template>
 
 <script setup lang="ts">
 import ConfirmActionModal from '../components/ConfirmActionModal.vue'
+import ProfileSnapshotModal from '../components/ProfileSnapshotModal.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import UserProfileCard from '../components/UserProfileCard.vue'
@@ -97,6 +118,19 @@ const inviteModalMessage = computed(() =>
     : ''
 )
 
+// Unmatch modal state
+const showUnmatchModal = ref(false)
+const selectedUnmatchProfile = ref(null)
+const unmatchModalMessage = computed(() =>
+  selectedUnmatchProfile.value
+    ? `Are you sure you want to unmatch with ${selectedUnmatchProfile.value.displayname}? This will delete your conversation and you won't be able to message each other.`
+    : ''
+)
+
+// Profile modal state
+const showProfileModal = ref(false)
+const selectedProfile = ref(null)
+
 // Track thumbs-ups sent by current user
 const thumbsUpsSent = ref(new Set())
 
@@ -108,6 +142,9 @@ const thumbsUpsReceived = ref(new Set())
 
 // Track mutual matches per profile (cached results from _hasMutualMatch)
 const mutualMatchCache = ref(new Map<string, boolean>())
+
+// Track active match IDs: userId -> matchId (for unmatch functionality)
+const activeMatchIds = ref(new Map<string, string>())
 
 // Check if a profile has a mutual match with current user
 async function checkMutualMatch(profileId: string): Promise<boolean> {
@@ -349,6 +386,28 @@ function openInviteModal(profile) {
   showInviteModal.value = true
 }
 
+async function handleShowProfile(profile) {
+  // Fetch username if not already in profile
+  const profileId = profile._id || profile.userId
+  if (!profile.username && profileId) {
+    try {
+      const usernameResult = await ApiService.callConceptAction<{ username: string } | { error: string }>(
+        'PasswordAuthentication',
+        '_getUsername',
+        { user: profileId }
+      )
+      if (usernameResult && !('error' in usernameResult)) {
+        profile.username = usernameResult.username
+      }
+    } catch (e) {
+      console.warn('Failed to fetch username for profile:', e)
+    }
+  }
+  
+  selectedProfile.value = profile
+  showProfileModal.value = true
+}
+
 async function navigateToChat(profileId: string) {
   try {
     const session = authStore.session
@@ -389,6 +448,160 @@ async function navigateToChat(profileId: string) {
   } catch (e) {
     console.error('[navigateToChat] Error:', e)
     error.value = e instanceof Error ? e.message : 'Failed to open chat'
+  }
+}
+
+function handleUnmatch(profile: any) {
+  selectedUnmatchProfile.value = profile
+  showUnmatchModal.value = true
+}
+
+async function confirmUnmatch() {
+  if (!selectedUnmatchProfile.value) {
+    showUnmatchModal.value = false
+    return
+  }
+
+  const profile = selectedUnmatchProfile.value
+  const otherUserId = profile.userId || profile._id || profile.id
+  const currentUserId = authStore.user?.id
+
+  if (!otherUserId || !currentUserId) {
+    error.value = 'Missing user information'
+    showUnmatchModal.value = false
+    return
+  }
+
+  try {
+    const session = authStore.session
+    if (!session) {
+      error.value = 'Session not found'
+      showUnmatchModal.value = false
+      return
+    }
+
+    // Step 1: Get thread ID
+    let threadId: string | undefined
+    try {
+      const threadsResult = await ApiService.callConceptAction<any>(
+        'Messaging',
+        '_getThreadsForUser',
+        { user: currentUserId }
+      )
+
+      const threads = Array.isArray(threadsResult) 
+        ? threadsResult 
+        : threadsResult?.threads || []
+
+      // Find thread where userA or userB matches the other user
+      const matchingThread = threads.find((thread: any) => {
+        const userA = thread.userA
+        const userB = thread.userB
+        return (userA === otherUserId || userA === profile._id || userA === profile.id) ||
+               (userB === otherUserId || userB === profile._id || userB === profile.id)
+      })
+
+      if (matchingThread) {
+        threadId = matchingThread._id || matchingThread.id
+        console.log('[confirmUnmatch] Found thread ID:', threadId)
+      } else {
+        console.warn('[confirmUnmatch] No thread found for users:', { currentUserId, otherUserId })
+      }
+    } catch (e) {
+      console.error('[confirmUnmatch] Error fetching threads:', e)
+      // Continue - thread might not exist yet
+    }
+
+    // Step 2: Get match ID from stored active matches
+    // Try all ID variants to find the match ID
+    const profileIdVariants = [
+      otherUserId,
+      profile._id,
+      profile.userId,
+      profile.id
+    ].filter(Boolean)
+    
+    let matchId: string | undefined
+    for (const id of profileIdVariants) {
+      const storedMatchId = activeMatchIds.value.get(id)
+      if (storedMatchId) {
+        matchId = storedMatchId
+        console.log('[confirmUnmatch] Found match ID from cache:', matchId, 'for user ID:', id)
+        break
+      }
+    }
+    
+    if (!matchId) {
+      console.warn('[confirmUnmatch] No match ID found in cache for user:', otherUserId, 'variants:', profileIdVariants)
+      console.warn('[confirmUnmatch] Available match IDs:', Array.from(activeMatchIds.value.entries()))
+    }
+
+    // Step 3: Unmatch the users
+    if (matchId) {
+      try {
+        await ApiService.callConceptAction('PartnerMatching', 'unmatch', {
+          activeMatch: matchId,
+          userA: currentUserId,
+          userB: otherUserId
+        })
+        console.log('[confirmUnmatch] Successfully unmatched users')
+      } catch (e) {
+        console.error('[confirmUnmatch] Error unmatching:', e)
+        // Continue to delete chat even if unmatch fails
+      }
+    } else {
+      console.warn('[confirmUnmatch] No match ID found, skipping unmatch call')
+    }
+
+    // Step 4: Delete chat for both users (if thread exists)
+    if (threadId) {
+      try {
+        // Delete chat for current user
+        await ApiService.callConceptAction('Messaging', 'deleteChat', {
+          initiator: currentUserId,
+          thread: threadId
+        })
+        console.log('[confirmUnmatch] Deleted chat for current user')
+
+        // Delete chat for other user
+        await ApiService.callConceptAction('Messaging', 'deleteChat', {
+          initiator: otherUserId,
+          thread: threadId
+        })
+        console.log('[confirmUnmatch] Deleted chat for other user')
+      } catch (e) {
+        console.error('[confirmUnmatch] Error deleting chat:', e)
+        // Continue - chat might already be deleted
+      }
+    } else {
+      console.warn('[confirmUnmatch] No thread ID found, skipping chat deletion')
+    }
+
+    // Update local state
+    const allProfileIdVariants = [
+      otherUserId,
+      profile._id,
+      profile.userId,
+      profile.id
+    ].filter(Boolean)
+
+    allProfileIdVariants.forEach(id => {
+      mutualMatchCache.value.delete(id)
+      thumbsUpsSent.value.delete(id)
+      suggestionIds.value.delete(id)
+    })
+
+    showUnmatchModal.value = false
+    selectedUnmatchProfile.value = null
+
+    // Optionally refresh the profiles list and mutual match cache
+    await fetchUsersInArea()
+    await fetchSentThumbsUps()
+  } catch (e) {
+    console.error('[confirmUnmatch] Error:', e)
+    error.value = e instanceof Error ? e.message : 'Failed to unmatch'
+    showUnmatchModal.value = false
+    selectedUnmatchProfile.value = null
   }
 }
 
@@ -462,9 +675,111 @@ function matchesTimeOfDayCategory(currentUserTime: string | undefined, partnerTi
 }
 
 // Helper function to check mutual match for a profile ID
+// This is reactive because it accesses the ref, so it will update when cache changes
 function hasMutualMatch(profileId: string): boolean {
-  return mutualMatchCache.value.get(profileId) || false
+  if (!profileId) return false
+  
+  // Check all possible ID variants
+  const idVariants = [profileId]
+  if (profileId) {
+    // Also check if there's a profile with this ID that might have different ID format
+    const profile = profiles.value.find((p: any) => 
+      (p._id === profileId || p.userId === profileId || p.id === profileId)
+    )
+    if (profile) {
+      idVariants.push(profile._id, profile.userId, profile.id)
+    }
+  }
+  
+  // Check if any variant is in the cache
+  const hasMatch = idVariants.some(id => id && mutualMatchCache.value.get(id) === true) || false
+  
+  return hasMatch
 }
+
+// Helper function to get mutual match status for a profile object
+// This ensures reactivity by accessing both the profile and the cache
+function getMutualMatchStatus(profile: any): boolean {
+  const profileId = profile._id || profile.userId || profile.id
+  if (!profileId) return false
+  
+  // Get all ID variants for this profile
+  const idVariants = [
+    profileId,
+    profile._id,
+    profile.userId,
+    profile.id
+  ].filter(Boolean)
+  
+  // Check if any variant is in the cache as true
+  const hasMatch = idVariants.some(id => {
+    const cached = mutualMatchCache.value.get(id)
+    return cached === true
+  })
+  
+  if (hasMatch) {
+    console.log('[getMutualMatchStatus] TRUE for profile:', profile.displayname, 'ID:', profileId, 'variants:', idVariants)
+  }
+  
+  return hasMatch
+}
+
+// Helper function to get mutual match for a profile (for template binding)
+// This function accesses the reactive cache directly to ensure reactivity
+function getMutualMatchForProfile(profile: any): boolean {
+  // Access the cache directly - this ensures Vue tracks the dependency
+  const cacheValue = mutualMatchCache.value
+  const profileId = profile._id || profile.userId || profile.id
+  
+  if (!profileId) return false
+  
+  const idVariants = [
+    profileId,
+    profile._id,
+    profile.userId,
+    profile.id
+  ].filter(Boolean)
+  
+  const hasMatch = idVariants.some(id => cacheValue.get(id) === true)
+  return hasMatch
+}
+
+// Create a computed object that maps profile IDs to mutual match status
+// This ensures Vue tracks changes to the mutual match cache
+const profileMutualMatches = computed(() => {
+  const result: Record<string, boolean> = {}
+  // Access mutualMatchCache to ensure reactivity
+  const cacheEntries = Array.from(mutualMatchCache.value.entries())
+  
+  profiles.value.forEach((profile: any) => {
+    const profileId = profile._id || profile.userId || profile.id
+    if (profileId) {
+      const idVariants = [
+        profileId,
+        profile._id,
+        profile.userId,
+        profile.id
+      ].filter(Boolean)
+      const hasMatch = idVariants.some(id => {
+        // Access the cache to ensure reactivity
+        const cached = mutualMatchCache.value.get(id)
+        return cached === true
+      })
+      result[profileId] = hasMatch
+      // Also set for all ID variants
+      idVariants.forEach(id => {
+        if (id) result[id] = hasMatch
+      })
+      
+      if (hasMatch) {
+        console.log('[profileMutualMatches] TRUE for:', profile.displayname, 'ID:', profileId, 'variants:', idVariants)
+      }
+    }
+  })
+  
+  console.log('[profileMutualMatches] Computed result:', result)
+  return result
+})
 
 // Filtered profiles (excluding current user, matching pace and user-selected filters)
 const filteredProfiles = computed(() => {
@@ -643,16 +958,114 @@ async function fetchUsersInArea() {
       return p.displayname && p.displayname !== 'Unknown User' && p.isActive !== false
     })
     
-    // Check mutual matches for all loaded profiles in background
-    profiles.value.forEach(async (profile: any) => {
-      const profileId = profile._id || profile.userId
-      if (profileId) {
-        const hasMutual = await checkMutualMatch(profileId)
-        if (hasMutual) {
-          mutualMatchCache.value.set(profileId, true)
-        }
+    // Get all active matches to determine which profiles should show unmatch button
+    try {
+      const session = authStore.session
+      if (session && currentUserId) {
+        const matchesResult = await ApiService.callConceptAction<any>(
+          'PartnerMatching',
+          '_getActiveMatches',
+          { user: currentUserId }
+        )
+        
+        const matches = Array.isArray(matchesResult)
+          ? matchesResult
+          : matchesResult?.matches || []
+        
+        console.log('[fetchUsersInArea] Found active matches:', matches.length)
+        console.log('[fetchUsersInArea] Active matches data:', matches)
+        
+        // Clear previous match data and prepare new maps
+        const newCache = new Map<string, boolean>()
+        const newMatchIds = new Map<string, string>()
+        
+        // Process each active match
+        matches.forEach((match: any) => {
+          const matchId = match._id || match.id
+          if (!matchId) {
+            console.warn('[fetchUsersInArea] Match missing ID:', match)
+            return
+          }
+          
+          // Handle different match structures
+          // Structure 1: { userA: '...', userB: '...' }
+          // Structure 2: { users: ['...', '...'] }
+          let userA: string | undefined
+          let userB: string | undefined
+          
+          if (match.userA && match.userB) {
+            userA = match.userA
+            userB = match.userB
+          } else if (Array.isArray(match.users) && match.users.length >= 2) {
+            userA = match.users[0]
+            userB = match.users[1]
+          }
+          
+          if (!userA || !userB) {
+            console.warn('[fetchUsersInArea] Match missing user data:', match)
+            return
+          }
+          
+          // Determine which user is the other user (not current user)
+          const currentUserIdVariants = [
+            currentUserId,
+            authStore.user?.id,
+            authStore.user?.username
+          ].filter(Boolean)
+          
+          const otherUser = currentUserIdVariants.includes(userA) ? userB : userA
+          
+          if (otherUser) {
+            // Store match ID for this user (for unmatch functionality)
+            newMatchIds.set(otherUser, matchId)
+            
+            // Also store all ID variants for this user
+            // Find the profile and cache all its ID variants
+            const profile = profiles.value.find((p: any) => {
+              const profileId = p._id || p.userId || p.id
+              return profileId === otherUser || 
+                     p._id === otherUser || 
+                     p.userId === otherUser || 
+                     p.id === otherUser ||
+                     p.username === otherUser
+            })
+            
+            if (profile) {
+              const profileIdVariants = [
+                profile._id,
+                profile.userId,
+                profile.id,
+                otherUser
+              ].filter(Boolean)
+              
+              // Mark as having a mutual match
+              profileIdVariants.forEach(id => {
+                if (id) {
+                  newCache.set(id, true)
+                  newMatchIds.set(id, matchId) // Store match ID for all ID variants
+                }
+              })
+              
+              console.log('[fetchUsersInArea] Processed match for profile:', profile.displayname, 'matchId:', matchId, 'otherUser:', otherUser)
+            } else {
+              // Profile not loaded yet, but store the match ID anyway
+              newMatchIds.set(otherUser, matchId)
+              newCache.set(otherUser, true)
+              console.log('[fetchUsersInArea] Processed match for user (profile not loaded):', otherUser, 'matchId:', matchId)
+            }
+          }
+        })
+        
+        // Replace the entire Map to trigger reactivity (Vue doesn't track Map mutations deeply)
+        mutualMatchCache.value = newCache
+        activeMatchIds.value = newMatchIds
+        
+        console.log('[fetchUsersInArea] Active match IDs map:', Array.from(activeMatchIds.value.entries()))
+        console.log('[fetchUsersInArea] Mutual match cache:', Array.from(mutualMatchCache.value.entries()))
       }
-    })
+    } catch (e) {
+      console.warn('[fetchUsersInArea] Error fetching active matches:', e)
+    }
   } catch (e) {
     console.error('Error fetching users in area:', e)
     error.value = e instanceof Error ? e.message : 'Failed to fetch users in your area.'
@@ -833,6 +1246,7 @@ onMounted(async () => {
   font-size: 1rem;
   margin-bottom: 1.5rem;
   line-height: 1.5;
+  text-align: center;
 }
 .profiles-list {
   display: grid;
