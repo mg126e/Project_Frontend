@@ -2,6 +2,7 @@
 
 Team Members: Gloria, Ananya, Marin
 
+[RunBudy Run On Render](https://runbuddy.onrender.com)
 
 ## Setup
 
